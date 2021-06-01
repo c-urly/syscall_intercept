@@ -120,7 +120,7 @@ find_sections(struct intercept_desc *desc, int fd)
 
 	xlseek(fd, sec_headers[elf_header.e_shstrndx].sh_offset, SEEK_SET);
 	xread(fd, sec_string_table,
-	    sec_headers[elf_header.e_shstrndx].sh_size);
+		sec_headers[elf_header.e_shstrndx].sh_size);
 
 	bool text_section_found = false;
 
@@ -129,12 +129,12 @@ find_sections(struct intercept_desc *desc, int fd)
 		char *name = sec_string_table + section->sh_name;
 
 		debug_dump("looking at section: \"%s\" type: %ld\n",
-		    name, (long)section->sh_type);
+			name, (long)section->sh_type);
 		if (strcmp(name, ".text") == 0) {
 			text_section_found = true;
 			add_text_info(desc, section, i);
 		} else if (section->sh_type == SHT_SYMTAB ||
-		    section->sh_type == SHT_DYNSYM) {
+			section->sh_type == SHT_DYNSYM) {
 			debug_dump("found symbol table: %s\n", name);
 			add_table_info(&desc->symbol_tables, section);
 		} else if (section->sh_type == SHT_RELA) {
@@ -201,7 +201,7 @@ allocate_nop_table(struct intercept_desc *desc)
 	desc->max_nop_count = calculate_table_count(desc);
 	desc->nop_count = 0;
 	desc->nop_table =
-	    xmmap_anon(desc->max_nop_count * sizeof(desc->nop_table[0]));
+		xmmap_anon(desc->max_nop_count * sizeof(desc->nop_table[0]));
 }
 
 /*
@@ -248,7 +248,7 @@ has_jump(const struct intercept_desc *desc, unsigned char *addr)
 {
 	if (addr >= desc->text_start && addr <= desc->text_end)
 		return is_bit_set(desc->jump_table,
-		    (uint64_t)(addr - desc->text_start));
+			(uint64_t)(addr - desc->text_start));
 	else
 		return false;
 }
@@ -309,7 +309,7 @@ find_jumps_in_section_syms(struct intercept_desc *desc, Elf64_Shdr *section,
 			continue; /* it is not in the text section */
 
 		debug_dump("jump target: %lx\n",
-		    (unsigned long)syms[i].st_value);
+			(unsigned long)syms[i].st_value);
 
 		unsigned char *address = desc->base_addr + syms[i].st_value;
 
@@ -358,10 +358,10 @@ find_jumps_in_section_rela(struct intercept_desc *desc, Elf64_Shdr *section,
 				/* Relocation type: "Adjust by program base" */
 
 				debug_dump("jump target: %lx\n",
-				    (unsigned long)syms[i].r_addend);
+					(unsigned long)syms[i].r_addend);
 
 				unsigned char *address =
-				    desc->base_addr + syms[i].r_addend;
+					desc->base_addr + syms[i].r_addend;
 
 				mark_jump(desc, address);
 
@@ -471,7 +471,7 @@ crawl_text(struct intercept_desc *desc)
 	 */
 	unsigned has_prevs = 0;
 	struct intercept_disasm_context *context =
-	    intercept_disasm_init(desc->text_start, desc->text_end);
+		intercept_disasm_init(desc->text_start, desc->text_end);
 
 	while (code <= desc->text_end) {
 		struct intercept_disasm_result result;
@@ -526,7 +526,7 @@ crawl_text(struct intercept_desc *desc)
 			patch->syscall_addr = code - SYSCALL_INS_SIZE;
 
 			ptrdiff_t syscall_offset = patch->syscall_addr -
-			    (desc->text_start - desc->text_offset);
+				(desc->text_start - desc->text_offset);
 
 			assert(syscall_offset >= 0);
 
@@ -559,7 +559,7 @@ get_min_address(void)
 	if (min_address != 0)
 		return min_address;
 
-	min_address = 0x10000; /* best guess */
+	min_address = PAGE_SIZE + 1; /* best guess */
 
 	int fd = syscall_no_intercept(SYS_open, "/proc/sys/vm/mmap_min_addr",
 					O_RDONLY);
@@ -588,11 +588,14 @@ get_min_address(void)
 void
 allocate_trampoline_table(struct intercept_desc *desc)
 {
-	char *e = getenv("INTERCEPT_NO_TRAMPOLINE");
+	// char *e = getenv("INTERCEPT_NO_TRAMPOLINE");
 
 	/* Use the extra trampoline table by default */
-	desc->uses_trampoline_table = (e == NULL) || (e[0] == '0');
+	// desc->uses_trampoline_table = (e == NULL) || (e[0] == '0');
 
+	// We need to use always the trampoline
+
+	desc->uses_trampoline_table = true;
 	if (!desc->uses_trampoline_table) {
 		desc->trampoline_table = NULL;
 		desc->trampoline_table_size = 0;
@@ -605,7 +608,7 @@ allocate_trampoline_table(struct intercept_desc *desc)
 	unsigned char *guess; /* Where we would like to allocate the table */
 	size_t size;
 
-	if ((uintptr_t)desc->text_end < INT32_MAX) {
+	if ((uintptr_t)desc->text_end < (INT32_MAX>>8)) {
 		/* start from the bottom of memory */
 		guess = (void *)0;
 	} else {
@@ -615,15 +618,15 @@ allocate_trampoline_table(struct intercept_desc *desc)
 		 * Round up to a memory page boundary, as this address must be
 		 * mappable.
 		 */
-		guess = desc->text_end - INT32_MAX;
+		guess = desc->text_end - (INT32_MAX>>8);
 		guess = (unsigned char *)(((uintptr_t)guess)
-				& ~((uintptr_t)(0xfff))) + 0x1000;
+		& ~((uintptr_t)(0xffff)));
 	}
 
 	if ((uintptr_t)guess < get_min_address())
 		guess = (void *)get_min_address();
 
-	size = 64 * 0x1000; /* XXX: don't just guess */
+	size = 1 * ((size_t)65536>>1); /* XXX: don't just guess */
 
 	if ((maps = fopen("/proc/self/maps", "r")) == NULL)
 		xabort("fopen /proc/self/maps");
@@ -653,9 +656,11 @@ allocate_trampoline_table(struct intercept_desc *desc)
 		 */
 		guess = end;
 
-		if (guess + size >= desc->text_start + INT32_MAX) {
+		if (guess + size >= desc->text_start + (INT32_MAX>>8)) {
 			/* Too far away */
-			xabort("unable to find place for trampoline table");
+			debug_dump("unable to find: %lx for trampoline table\n",
+			(unsigned long)(size));
+			// xabort("unable to find place for trampoline table");
 		}
 	}
 
@@ -687,9 +692,9 @@ void
 find_syscalls(struct intercept_desc *desc)
 {
 	debug_dump("find_syscalls in %s "
-	    "at base_addr 0x%016" PRIxPTR "\n",
-	    desc->path,
-	    (uintptr_t)desc->base_addr);
+		"at base_addr 0x%016" PRIxPTR "\n",
+		desc->path,
+		(uintptr_t)desc->base_addr);
 
 	desc->count = 0;
 
@@ -697,20 +702,20 @@ find_syscalls(struct intercept_desc *desc)
 
 	find_sections(desc, fd);
 	debug_dump(
-	    "%s .text mapped at 0x%016" PRIxPTR " - 0x%016" PRIxPTR " \n",
-	    desc->path,
-	    (uintptr_t)desc->text_start,
-	    (uintptr_t)desc->text_end);
+		"%s .text mapped at 0x%016" PRIxPTR " - 0x%016" PRIxPTR " \n",
+		desc->path,
+		(uintptr_t)desc->text_start,
+		(uintptr_t)desc->text_end);
 	allocate_jump_table(desc);
 	allocate_nop_table(desc);
 
 	for (Elf64_Half i = 0; i < desc->symbol_tables.count; ++i)
 		find_jumps_in_section_syms(desc,
-		    desc->symbol_tables.headers + i, fd);
+			desc->symbol_tables.headers + i, fd);
 
 	for (Elf64_Half i = 0; i < desc->rela_tables.count; ++i)
 		find_jumps_in_section_rela(desc,
-		    desc->rela_tables.headers + i, fd);
+			desc->rela_tables.headers + i, fd);
 
 	syscall_no_intercept(SYS_close, fd);
 

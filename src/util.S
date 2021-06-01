@@ -30,38 +30,21 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-.global has_ymm_registers;
-.hidden has_ymm_registers;
-.type   has_ymm_registers, @function
 
 .global syscall_no_intercept;
 .type   syscall_no_intercept, @function
 
 .text
 
-has_ymm_registers:
-	.cfi_startproc
-	pushq       %rbx
-	movq        $0x1, %rax
-	cpuid
-	movq        %rcx, %rax
-	shrq        $28, %rax
-	andq        $1, %rax
-	popq        %rbx
-	retq
-	.cfi_endproc
-
-.size   has_ymm_registers, .-has_ymm_registers
-
 syscall_no_intercept:
-	movq        %rdi, %rax  /* convert from linux ABI calling */
-	movq        %rsi, %rdi  /* convention to syscall calling convention */
-	movq        %rdx, %rsi
-	movq        %rcx, %rdx
-	movq        %r8, %r10
-	movq        %r9, %r8
-	movq        8(%rsp), %r9
-	syscall
-	ret
-
+    mr 0, 3
+    mr 3, 4
+    mr 4, 5
+    mr 5, 6
+    mr 6, 7
+    mr 7, 8
+    mr 8, 9
+    mr 9, 10
+    sc
+    blr             // Error code in cr0.so
 .size   syscall_no_intercept, .-syscall_no_intercept

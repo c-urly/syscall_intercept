@@ -30,7 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # see nosyscall.in.S
-.intel_syntax noprefix
+
 
 .global text_start;
 .global text_end;
@@ -42,13 +42,23 @@
 .text
 
 text_start:
-fibonacci:
-		.cfi_startproc
-		.cfi_def_cfa_offset 0
-		xor     rax, rax
-		mov     rcx, rsi
-.loop:		xadd    rax, rdi
-		loop    .loop
-		ret
-		.cfi_endproc
+_SFIB:  cmpwi   r3,2
+        bge     1f
+        li      r3,1
+        blr
+1:      mflr    r0
+        stw     r0,-4(r1)
+        addi    r3,r3,-1
+        stwu    r3,-8(r1)
+        bl      _SFIB
+        lwz     r4,0(r1)
+        stw     r3,0(r1)
+        addi    r3,r4,-1
+        bl      _SFIB
+        lwz     r4,0(r1)
+        add     r3,r3,r4
+        lwz     r0,4(r1)
+        addi    r1,r1,8
+        mtlr    r0
+        blr
 text_end:

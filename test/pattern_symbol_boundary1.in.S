@@ -35,8 +35,6 @@
 # This test has two overlapping symbols in the text, it should not
 # confuse the patcher.
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
@@ -50,15 +48,15 @@
 .text
 
 text_start:
-		xor     rax, rax
-		mov     rax, 1
+		li r3, 0
+		li r3, 1
 dummy_symbol0:	nop
-dummy_symbol1:	syscall
-		cmp     rax, -1
+dummy_symbol1:	sc
+		cmpwi     r3, -1
 		.size dummy_symbol0, .-dummy_symbol0
-		mov     rax, 2
+		li     r3, 2
 		.size dummy_symbol1, .-dummy_symbol1
-		syscall
-		inc     rax
-		inc     rax
+		sc
+		addi r3,r3,1
+		addi r3,r3,1
 text_end:

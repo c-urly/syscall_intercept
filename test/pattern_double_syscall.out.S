@@ -31,7 +31,6 @@
 
 # see double_syscall.in.S
 
-.intel_syntax noprefix
 
 .global text_start;
 .global text_end;
@@ -42,7 +41,7 @@
 
 text_start:
 		nop
-		syscall
-		syscall
+		b dst0
+		b dst1     # It should be dst1?
 		nop
 text_end:

@@ -49,60 +49,62 @@
 # cases -- the only thing that matters, is to have these at predictable
 # addresses.
 
-.intel_syntax noprefix
+#define r0 0
+#define r1 1
+#define r2 2
+#define r3 3
+#define r4 4
+#define r5 5
+#define r6 6
+#define r7 7
+#define r8 8
+#define r9 9
+#define r10 10
+#define r12 12
+#define r13 13
+#define r30 30
+#define r31 31
 
 .global trampoline_table;
 .global trampoline_table_end;
 
 .data
-
 trampoline_table:
-dst0:		jmp     [rip]
-		.space 8, 0
-dst1:		jmp     [rip]
-		.space 8, 0
-dst2:		jmp     [rip]
-		.space 8, 0
-dst3:		jmp     [rip]
-		.space 8, 0
-dst4:		jmp     [rip]
-		.space 8, 0
-dst5:		jmp     [rip]
-		.space 8, 0
-dst6:		jmp     [rip]
-		.space 8, 0
-dst7:		jmp     [rip]
-		.space 8, 0
-dst8:		jmp     [rip]
-		.space 8, 0
-dst9:		jmp     [rip]
-		.space 8, 0
-dst10:		jmp     [rip]
-		.space 8, 0
-dst11:		jmp     [rip]
-		.space 8, 0
-dst12:		jmp     [rip]
-		.space 8, 0
-dst13:		jmp     [rip]
-		.space 8, 0
-dst14:		jmp     [rip]
-		.space 8, 0
-dst15:		jmp     [rip]
-		.space 8, 0
-dst16:		jmp     [rip]
-		.space 8, 0
-dst17:		jmp     [rip]
-		.space 8, 0
-dst18:		jmp     [rip]
-		.space 8, 0
-dst19:		jmp     [rip]
-		.space 8, 0
-dst20:		jmp     [rip]
-		.space 8, 0
-dst21:		jmp     [rip]
-		.space 8, 0
-dst22:		jmp     [rip]
-		.space 8, 0
-dst23:		jmp     [rip]
-		.space 8, 0
+        dst0:		b     k0
+k0:		nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+
+dst1:		b     k1
+k1:		nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+dst2:		b     k2
+k2:		nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+dst3:		b     k3
+k3:     nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
 trampoline_table_end:

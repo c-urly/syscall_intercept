@@ -67,10 +67,25 @@ int (*intercept_hook_point)(long syscall_number,
 			long *result)
 	__attribute__((visibility("default")));
 
-void (*intercept_hook_point_clone_child)(void)
+void (*intercept_hook_point_clone_child)(
+		unsigned long flags, void *child_stack,
+		int *ptid, int *ctid,
+		long newtls)
 	__attribute__((visibility("default")));
-void (*intercept_hook_point_clone_parent)(long)
+
+void (*intercept_hook_point_clone_parent)(
+		unsigned long flags, void *child_stack,
+		int *ptid, int *ctid,
+		long newtls, long returned_pid)
 	__attribute__((visibility("default")));
+
+void (*intercept_hook_point_post_kernel)(long syscall_number,
+			long arg0, long arg1,
+			long arg2, long arg3,
+			long arg4, long arg5,
+			long result)
+	__attribute__((visibility("default")));
+
 
 bool debug_dumps_on;
 
@@ -112,28 +127,48 @@ void __attribute__((noreturn)) xlongjmp(long rip, long rsp, long rax);
  */
 struct context {
 	struct patch_desc *patch_desc;
-	long rip;
-	long r15;
-	long r14;
-	long r13;
-	long r12;
-	long r10;
-	long r9;
-	long r8;
-	long rsp;
-	long rbp;
-	long rdi;
-	long rsi;
-	long rbx;
-	long rdx;
-	long rax;
-	char padd[0x200 - 0x168]; /* see: stack layout in intercept_wrapper.s */
-	long SIMD[16][8]; /* 8 SSE, 8 AVX, or 16 AVX512 registers */
+
+	long ccr;
+	long lr; //
+	long ctr;
+	long xer;
+	long gpr0;  // ip  // rip
+	long gpr1;
+	long gpr2;
+	long gpr3; // arg0 (rdi)
+	long gpr4; // rsi  arg1
+	long gpr5; // rdx arg2
+	long gpr6; // r10 arg3
+	long gpr7; // r8 arg4
+	long gpr8; // r9 arg5
+	long gpr9;
+	long gpr10;
+	long gpr11;
+	long gpr12;
+	long gpr13; // arg0 (rdi)
+	long gpr14; // rsi  arg1
+	long gpr15; // rdx arg2
+	long gpr16; // r10 arg3
+	long gpr17; // r8 arg4
+	long gpr18; // r9 arg5
+	long gpr19;
+	long gpr20;
+	long gpr21;
+	long gpr22;
+	long gpr23; // arg0 (rdi)
+	long gpr24; // rsi  arg1
+	long gpr25; // rdx arg2
+	long gpr26; // r10 arg3
+	long gpr27; // r8 arg4
+	long gpr28; // r9 arg5
+	long gpr29;
+	long gpr30;
+	long gpr31;
 };
 
 struct wrapper_ret {
-	long rax;
-	long rdx;
+	long gpr3; // long rax;
+	long gpr4; // long rdx;
 };
 
 /* Should all objects be patched, or only libc and libpthread? */
@@ -232,7 +267,7 @@ get_name_from_proc_maps(uintptr_t addr)
 
 		/* Read the path into next_path */
 		if (sscanf(line, "%p-%p %*s %*x %*x:%*x %*u %s",
-		    (void **)&start, (void **)&end, next_path) != 3)
+			(void **)&start, (void **)&end, next_path) != 3)
 			continue;
 
 		if (addr < (uintptr_t)start)
@@ -412,7 +447,7 @@ analyze_object(struct dl_phdr_info *info, size_t size, void *data)
 	const char *path;
 
 	debug_dump("analyze_object called on \"%s\" at 0x%016" PRIxPTR "\n",
-	    info->dlpi_name, info->dlpi_addr);
+		info->dlpi_name, info->dlpi_addr);
 
 	if ((path = get_object_path(info)) == NULL)
 		return 0;
@@ -454,10 +489,10 @@ void
 mprotect_asm_wrappers(void)
 {
 	mprotect_no_intercept(
-	    round_down_address(asm_wrapper_space + PAGE_SIZE),
-	    sizeof(asm_wrapper_space) - PAGE_SIZE,
-	    PROT_READ | PROT_EXEC,
-	    "mprotect_asm_wrappers PROT_READ | PROT_EXEC");
+		round_down_address(asm_wrapper_space + PAGE_SIZE),
+		sizeof(asm_wrapper_space) - PAGE_SIZE,
+		PROT_READ | PROT_EXEC,
+		"mprotect_asm_wrappers PROT_READ | PROT_EXEC");
 }
 
 /*
@@ -592,14 +627,15 @@ xabort_on_syserror(long syscall_result, const char *msg)
 static void
 get_syscall_in_context(struct context *context, struct syscall_desc *sys)
 {
-	sys->nr = (int)context->rax; /* ignore higher 32 bits */
-	sys->args[0] = context->rdi;
-	sys->args[1] = context->rsi;
-	sys->args[2] = context->rdx;
-	sys->args[3] = context->r10;
-	sys->args[4] = context->r8;
-	sys->args[5] = context->r9;
+	sys->nr = (int)context->gpr0; /* ignore higher 32 bits */
+	sys->args[0] = context->gpr3;
+	sys->args[1] = context->gpr4;
+	sys->args[2] = context->gpr5;
+	sys->args[3] = context->gpr6;
+	sys->args[4] = context->gpr7;
+	sys->args[5] = context->gpr8;
 }
+
 
 /*
  * intercept_routine(...)
@@ -643,23 +679,23 @@ intercept_routine(struct context *context)
 	get_syscall_in_context(context, &desc);
 
 	if (handle_magic_syscalls(&desc, &result) == 0)
-		return (struct wrapper_ret){.rax = result, .rdx = 1 };
+		return (struct wrapper_ret){.gpr3 = result, .gpr4 = 1 };
 
 	intercept_log_syscall(patch, &desc, UNKNOWN, 0);
 
 	if (intercept_hook_point != NULL)
 		forward_to_kernel = intercept_hook_point(desc.nr,
-		    desc.args[0],
-		    desc.args[1],
-		    desc.args[2],
-		    desc.args[3],
-		    desc.args[4],
-		    desc.args[5],
-		    &result);
+			desc.args[0],
+			desc.args[1],
+			desc.args[2],
+			desc.args[3],
+			desc.args[4],
+			desc.args[5],
+			&result);
 
 	if (desc.nr == SYS_vfork || desc.nr == SYS_rt_sigreturn) {
 		/* can't handle these syscalls the normal way */
-		return (struct wrapper_ret){.rax = context->rax, .rdx = 0 };
+		return (struct wrapper_ret){.gpr3 = context->gpr3, .gpr4 = 0 };
 	}
 
 	if (forward_to_kernel) {
@@ -677,8 +713,8 @@ intercept_routine(struct context *context)
 		 */
 		if (desc.nr == SYS_clone && desc.args[1] != 0)
 			return (struct wrapper_ret){
-				.rax = context->rax, .rdx = 2 };
-		else
+			.gpr3 = context->gpr3, .gpr4 = 2 };
+		else {
 			result = syscall_no_intercept(desc.nr,
 					desc.args[0],
 					desc.args[1],
@@ -686,11 +722,38 @@ intercept_routine(struct context *context)
 					desc.args[3],
 					desc.args[4],
 					desc.args[5]);
+		unsigned long long i;
+		__asm__ volatile
+		(
+		"mfcr %0\n\t"
+		:"=r"(i) /* Output registers */
+		:
+		: /* No clobbered registers */);
+		context->ccr = i;
 	}
 
-	intercept_log_syscall(patch, &desc, KNOWN, result);
+		/*
+		 * some users might want to execute code after a syscall has
+		 * been forwarded to the kernel (for example, to check its
+		 * return value).
+		 */
+		if (intercept_hook_point_post_kernel != NULL)
+			intercept_hook_point_post_kernel(desc.nr,
+				desc.args[0],
+				desc.args[1],
+				desc.args[2],
+				desc.args[3],
+				desc.args[4],
+				desc.args[5],
+				result);
+	}
 
-	return (struct wrapper_ret){ .rax = result, .rdx = 1 };
+	if (result == -1) {
+		intercept_log_syscall(patch, &desc, KNOWN, -errno);
+	} else
+		intercept_log_syscall(patch, &desc, KNOWN, result);
+
+	return (struct wrapper_ret){ .gpr3 = result, .gpr4 = 1 };
 }
 
 /*
@@ -701,13 +764,27 @@ intercept_routine(struct context *context)
 struct wrapper_ret
 intercept_routine_post_clone(struct context *context)
 {
-	if (context->rax == 0) {
+	struct syscall_desc desc;
+	get_syscall_in_context(context, &desc);
+	if (context->gpr3 == 0) {
 		if (intercept_hook_point_clone_child != NULL)
-			intercept_hook_point_clone_child();
+			intercept_hook_point_clone_child(
+				(unsigned long)desc.args[0],
+				(void *)desc.args[1],
+				(int *)desc.args[2],
+				(int *)desc.args[3],
+				desc.args[4]);
 	} else {
 		if (intercept_hook_point_clone_parent != NULL)
-			intercept_hook_point_clone_parent(context->rax);
+			intercept_hook_point_clone_parent(
+				(unsigned long)desc.args[0],
+				(void *)desc.args[1],
+				(int *)desc.args[2],
+				(int *)desc.args[3],
+				desc.args[4],
+				context->gpr0);
+
 	}
 
-	return (struct wrapper_ret){.rax = context->rax, .rdx = 1 };
+	return (struct wrapper_ret){.gpr3 = context->gpr3, .gpr4 = 1  };
 }

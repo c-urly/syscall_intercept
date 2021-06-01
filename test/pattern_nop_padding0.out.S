@@ -31,8 +31,6 @@
 
 # see pattern_nop_padding0.in.S
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
@@ -44,14 +42,19 @@
 .text
 
 text_start:
-		xor     rax, rax
-		mov     rax, 1
-		jmp     0f      # short jump to the newly created jmp below
-		cmp     rax, -1
-		mov     rax, 2
-		inc     rax
-		jmp     1f      # the nop started here, skip to the next instruction
-0:		jmp     dst0    # a jump with 32 bit displacement, starting at the
-		.byte   0x00    # second byte of the original nop instruction
-1:		inc     rax
+li r3, 0
+li r3, 1
+b dst0        # should be replaced with a jmp having 8bit disp.
+cmpwi r3, -1
+li r3, 2
+addi r3, r3, 1
+.byte   0x0f           # nop     DWORD PTR [rax+rax*1+0x0]
+.byte   0x1f           # this nop should be overwritten
+.byte   0x84           # to provide the jump that actually
+.byte   0x00           # jumps out of the text segment
+.byte   0x00
+.byte   0x00
+.byte   0x00
+.byte   0x00
+addi r3, r3, 1
 text_end:

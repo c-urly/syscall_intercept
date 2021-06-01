@@ -31,8 +31,6 @@
 
 # see pattern_symbol_boundary3.in.S
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
@@ -44,15 +42,17 @@
 .text
 
 text_start:
-		xor     rax, rax
-		mov     rax, 1
-		nop
-dummy_symbol:	not     rax
-		jmp     0f
-		cmp     rax, -1
-		mov     rax, 2
-		.size dummy_symbol, .-dummy_symbol
-		nop
-0:		jmp     dst0
-		inc     rax
+        li r3, 0
+        li r3, 1
+        nop
+dummy_symbol:
+        neg      r3, r3
+        b     0f
+        cmpwi r3, -1
+        li r3, 2
+        .size dummy_symbol, .-dummy_symbol
+        nop
+0:		b dst0
+        addi r3, r3, 1
+        addi r3, r3, 1
 text_end:

@@ -33,7 +33,6 @@
 # A simple test with a single syscall instruction.
 #
 
-.intel_syntax noprefix
 
 .global text_start;
 .global text_end;
@@ -43,7 +42,7 @@
 .text
 
 text_start:
-		mov     rax, 1
-		syscall
-		cmp     rax, -1
+		li     r3, 1
+		sc
+		cmpdi r3, -1
 text_end:

@@ -36,7 +36,7 @@
 # overwritten with a jmp instruction of the same size, and a jump with a longer
 # range can be inserted into the unused bytes in the nop instruction.
 
-.intel_syntax noprefix
+
 
 .global text_start;
 .global text_end;
@@ -49,12 +49,12 @@
 .text
 
 text_start:
-		xor     rax, rax
-		mov     rax, 1
-		syscall        # should be replaced with a jmp having 8bit disp.
-		cmp     rax, -1
-		mov     rax, 2
-		inc     rax
+		li r3, 0
+		li r3, 1
+		sc        # should be replaced with a jmp having 8bit disp.
+		cmpwi r3, -1
+		li r3, 2
+		addi r3, r3, 1
 		.byte   0x0f           # nop     DWORD PTR [rax+rax*1+0x0]
 		.byte   0x1f           # this nop should be overwritten
 		.byte   0x84           # to provide the jump that actually
@@ -63,6 +63,6 @@ text_start:
 		.byte   0x00
 		.byte   0x00
 		.byte   0x00
-		inc     rax
+		addi r3, r3, 1
 
 text_end:

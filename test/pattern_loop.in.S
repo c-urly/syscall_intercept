@@ -34,8 +34,6 @@
 # patching code is expected to recognize that the loop instruction can
 # not be relocated.
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
@@ -44,11 +42,11 @@
 .text
 
 text_start:
-.L0:		xor     rax, rax
-		mov     rax, 1
-		syscall
-		cmp     rax, -1
-		mov     rax, 2
-		syscall
-		loop    .L0 # this instruction should not be touched
+.L0:	li r3, 0
+		li r3, 1
+		sc
+		cmpwi r3, -1
+		li r3, 2
+		sc
+		bdnz    .L0 # this instruction should not be touched
 text_end:

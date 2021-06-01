@@ -34,7 +34,6 @@
 # text is expected to have two jump instructions, to two different
 # entries in the mock trampoline table.
 
-.intel_syntax noprefix
 
 .global text_start;
 .global text_end;
@@ -44,11 +43,11 @@
 .text
 
 text_start:
-		xor     rax, rax
-		mov     rax, 1
-		syscall
-		cmp     rax, -1
-		mov     rax, 2
-		syscall
-		cmp     rax, -1
+		li     r3, 0
+		li     r3, 1
+		sc
+		cmpdi r3, -1
+		li     r3, 2
+		sc
+		cmpdi r3, -1
 text_end:

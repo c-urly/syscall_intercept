@@ -60,7 +60,7 @@
 #undef _FORTIFY_SOURCE
 #endif
 
-#include <asm/prctl.h>
+// #include <asm/prctl.h>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -84,7 +84,7 @@
 #include <sys/file.h>
 #include <sys/fsuid.h>
 #include <sys/inotify.h>
-#include <sys/io.h>
+// #include <sys/io.h>
 #include <sys/ioctl.h>
 #include <sys/ipc.h>
 #include <sys/mman.h>
@@ -131,8 +131,8 @@ static char buffer[2][0x200];
  * some syscall has a string, or binary data buffer argument.
  */
 static const char input[2][sizeof(buffer[0])] = {
-	"input_data\x01\x02\x03\n\r\t",
-	"other_input_data\x01\x02\x03\n\r\t"};
+		"input_data\x01\x02\x03\n\r\t",
+		"other_input_data\x01\x02\x03\n\r\t"};
 
 /*
  * output data for buffers - expected to appear in the logs when
@@ -143,8 +143,8 @@ static const char input[2][sizeof(buffer[0])] = {
  * this test does not require syscall_intercept to handle that correctly.
  */
 static const char expected_output[2][sizeof(buffer[0])] = {
-	"expected_output_data\x06\xff\xe0\t"
-	"other_expected_output_data\x06\xff\xe0\t"};
+		"expected_output_data\x06\xff\xe0\t"
+		"other_expected_output_data\x06\xff\xe0\t"};
 
 /*
  * setup_buffers - Should be called before every test using a buffer.
@@ -204,9 +204,9 @@ hook(long syscall_number,
 }
 
 static const int all_o_flags =
-	O_RDWR | O_APPEND | O_APPEND | O_CLOEXEC | O_CREAT | O_DIRECTORY |
-	O_DSYNC | O_EXCL | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK | O_RSYNC |
-	O_SYNC | O_TRUNC;
+O_RDWR | O_APPEND | O_APPEND | O_CLOEXEC | O_CREAT | O_DIRECTORY |
+O_DSYNC | O_EXCL | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK | O_RSYNC |
+O_SYNC | O_TRUNC;
 
 int
 main(int argc, char **argv)
@@ -232,9 +232,9 @@ main(int argc, char **argv)
 	struct stat statbuf;
 	int fd2[2] = {123, 234};
 	struct pollfd pfds[3] = {
-		{.fd = 1, .events = 0},
-		{.fd = 7, .events = POLLIN | POLLPRI | POLLOUT | POLLRDHUP},
-		{.fd = 99, .events = POLLERR | POLLHUP | POLLNVAL }
+	{.fd = 1, .events = 0},
+	{.fd = 7, .events = POLLIN | POLLPRI | POLLOUT | POLLRDHUP},
+	{.fd = 99, .events = POLLERR | POLLHUP | POLLNVAL }
 	};
 
 	void *p0 = (void *)0x123000;
@@ -247,11 +247,11 @@ main(int argc, char **argv)
 	struct utsname uname_buf;
 
 	struct flock fl = {
-		.l_type = F_WRLCK,
-		.l_whence = SEEK_END,
-		.l_start = 123,
-		.l_len = 456,
-		.l_pid = 768
+			.l_type = F_WRLCK,
+			.l_whence = SEEK_END,
+			.l_start = 123,
+			.l_len = 456,
+			.l_pid = 768
 	};
 
 	magic_syscall_start_log(argv[1], "1");
@@ -352,7 +352,7 @@ main(int argc, char **argv)
 	brk(p0);
 	brk(NULL);
 	mremap(p0, ((size_t)UINT32_MAX) + 7, ((size_t)UINT32_MAX) + 77,
-			MREMAP_MAYMOVE);
+	MREMAP_MAYMOVE);
 	msync(p0, 0, MS_ASYNC);
 	msync(NULL, 888, MS_INVALIDATE);
 	mincore(p0, 99, p1);
@@ -610,8 +610,8 @@ main(int argc, char **argv)
 
 	syscall(SYS__sysctl, p0);
 
-	prctl(PR_CAPBSET_DROP, 1, 2, 3, 4);
-	syscall(SYS_arch_prctl, ARCH_SET_FS, p0);
+//	prctl(PR_CAPBSET_DROP, 1, 2, 3, 4);
+//	syscall(SYS_arch_prctl, ARCH_SET_FS, p0);
 
 	adjtimex(p0);
 
@@ -631,8 +631,8 @@ main(int argc, char **argv)
 	sethostname(input[0], len0);
 	setdomainname(input[0], len0);
 
-	iopl(1);
-	ioperm(3, 4, 1);
+//	iopl(1);
+//	ioperm(3, 4, 1);
 
 	syscall(SYS_init_module, p0, 16, p1);
 	syscall(SYS_finit_module, 3, p0, 0);
@@ -669,8 +669,8 @@ main(int argc, char **argv)
 
 	syscall(SYS_futex, p0, FUTEX_WAKE, 7L, p0, p1, 1L);
 
-	syscall(SYS_set_thread_area, p0);
-	syscall(SYS_get_thread_area, p0);
+//	syscall(SYS_set_thread_area, p0);
+//	syscall(SYS_get_thread_area, p0);
 
 	syscall(SYS_io_setup, 1, p0);
 	syscall(SYS_io_destroy, 77);
@@ -762,7 +762,7 @@ main(int argc, char **argv)
 	syscall(SYS_eventfd, 45);
 	syscall(SYS_eventfd2, 47, EFD_SEMAPHORE);
 
-	fallocate(1, FALLOC_FL_PUNCH_HOLE, 3, 4);
+//	fallocate(1, FALLOC_FL_PUNCH_HOLE, 3, 4);
 
 	syscall(SYS_perf_event_open, p0, 1L, 2L, 3L, 4L, 5L);
 

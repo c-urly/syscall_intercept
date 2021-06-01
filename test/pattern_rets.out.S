@@ -31,7 +31,7 @@
 
 # see rets.in.S
 
-.intel_syntax noprefix
+
 
 .global text_start;
 .global text_end;
@@ -41,15 +41,15 @@
 .text
 
 text_start:
-		mov     rax, 1
-		mov     rax, 1
-		mov     rax, 1
-		mov     rax, 1
-		ret
-		syscall
-		ret
-		cmp     rax, -1
-		cmp     rax, -1
-		cmp     rax, -1
-		cmp     rax, -1
+        li     0, 1
+        li     0, 1
+        li     0, 1
+        li     0, 1
+		blr
+		b dst0
+		blr
+        cmpwi     0, -1
+        cmpwi     0, -1
+        cmpwi     0, -1
+        cmpwi     0, -1
 text_end:

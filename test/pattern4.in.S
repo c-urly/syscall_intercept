@@ -32,7 +32,6 @@
 #
 # Same as pattern3.in.S, except with a call instruction this time.
 
-.intel_syntax noprefix
 
 .global text_start;
 .global text_end;
@@ -42,14 +41,14 @@
 .text
 
 text_start:
-		xor     rax, rax
-		mov     rax, 1
-		call    0f
-		cmp     rax, -1
-		cmp     rax, -1
-		cmp     rax, -1
+		li r3, 0
+		li r3, 1
+		bl     0f
+		cmpwi r3, -1
+		cmpwi r3, -1
+		cmpwi r3, -1
 		nop
-0:		mov     rax, 2
-		syscall
-		cmp     rax, -1
+0:		li r3, 2
+		sc
+		cmpwi r3, -1
 text_end:

@@ -36,7 +36,6 @@
 # instruction.
 # Also, the loop instruction can not be relocated.
 
-.intel_syntax noprefix
 
 .global text_start;
 .global text_end;
@@ -46,11 +45,11 @@
 .text
 
 text_start:
-		xor     rax, rax # this instruction should be left unchanged
-.L0:		mov     rax, 1
-		syscall
-		cmp     rax, -1
-		mov     rax, 2
-		syscall
-		loop    .L0 # this one as well
+		li r3, 0 # this instruction should be left unchanged
+.L0:	li r3, 1
+		sc
+		cmpwi     r3, -1
+		li r3, 2
+		sc
+		bdnz    .L0 # this one as well
 text_end:

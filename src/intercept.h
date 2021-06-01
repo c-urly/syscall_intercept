@@ -202,14 +202,15 @@ void mprotect_asm_wrappers(void);
  */
 void activate_patches(struct intercept_desc *desc);
 
-#define SYSCALL_INS_SIZE 2
-#define JUMP_INS_SIZE 5
-#define CALL_OPCODE 0xe8
-#define JMP_OPCODE 0xe9
-#define SHORT_JMP_OPCODE 0xeb
-#define PUSH_IMM_OPCODE 0x68
-#define NOP_OPCODE 0x90
-#define INT3_OPCODE 0xCC
+#define INSTRUCTION_SIZE 4
+#define SYSCALL_INS_SIZE INSTRUCTION_SIZE   // 6 bits
+#define JUMP_INS_SIZE INSTRUCTION_SIZE
+#define CALL_OPCODE 0x18
+#define JMP_OPCODE 0x8c
+#define SHORT_JMP_OPCODE 0x12
+#define PUSH_IMM_OPCODE 0x25
+#define NOP_OPCODE 0x18
+#define INT3_OPCODE 0x1F
 
 bool is_overwritable_nop(const struct intercept_disasm_result *ins);
 
@@ -217,7 +218,7 @@ void create_jump(unsigned char opcode, unsigned char *from, void *to);
 
 extern const char *cmdline;
 
-#define PAGE_SIZE ((size_t)0x1000)
+#define PAGE_SIZE ((size_t)65536)
 
 static inline unsigned char *
 round_down_address(unsigned char *address)

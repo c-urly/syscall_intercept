@@ -31,10 +31,10 @@
 
 #
 # A simple test with a two syscall instruction. Patching is expected to fail,
-# as there is not enough space for patching.
+# as there is not enough space for patching. It will not fail in PowerPC
 #
 
-.intel_syntax noprefix
+
 
 .global text_start;
 .global text_end;
@@ -45,7 +45,7 @@
 
 text_start:
 		nop
-		syscall
-		syscall
+		sc
+		sc
 		nop
 text_end:

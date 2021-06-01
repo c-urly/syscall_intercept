@@ -31,7 +31,6 @@
 
 # see pattern4.in.S
 
-.intel_syntax noprefix
 
 .global text_start;
 .global text_end;
@@ -41,20 +40,14 @@
 .text
 
 text_start:
-		xor     rax, rax
-		mov     rax, 1
-		call    0f
-		cmp     rax, -1
-		cmp     rax, -1
-		cmp     rax, -1
+		li r3, 0
+		li r3, 1
+		bl     0f
+		cmpwi r3, -1
+		cmpwi r3, -1
+		cmpwi r3, -1
 		nop
-0:		jmp     dst0
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
+0:		li r3, 2
+		b dst0
+		cmpwi r3, -1
 text_end:

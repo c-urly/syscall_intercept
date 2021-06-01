@@ -50,15 +50,25 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <errno.h>
 
 extern int (*intercept_hook_point)(long syscall_number,
 			long arg0, long arg1,
 			long arg2, long arg3,
 			long arg4, long arg5,
 			long *result);
-
-extern void (*intercept_hook_point_clone_child)(void);
-extern void (*intercept_hook_point_clone_parent)(long pid);
+extern void (*intercept_hook_point_clone_child)(
+			unsigned long flags, void *child_stack,
+			int *ptid, int *ctid, long newtls);
+extern void (*intercept_hook_point_clone_parent)(
+			unsigned long flags, void *child_stack,
+			int *ptid, int *ctid, long newtls,
+			long returned_pid);
+extern void (*intercept_hook_point_post_kernel)(long syscall_number,
+			long arg0, long arg1,
+			long arg2, long arg3,
+			long arg4, long arg5,
+			long result);
 
 /*
  * syscall_no_intercept - syscall without interception
@@ -74,13 +84,24 @@ long syscall_no_intercept(long syscall_number, ...);
  * syscall_error_code - examines a return value from
  * syscall_no_intercept, and returns an error code if said
  * return value indicates an error.
+ * In POWER9 we check a register so we must use it only once
+ * after the syscall_no_intercept call
  */
 static inline int
 syscall_error_code(long result)
 {
-	if (result < 0 && result >= -0x1000)
-		return (int)-result;
+	unsigned long long i;
+	__asm__ volatile
+	(
+	"mfcr %0\n\t"
+	:"=r"(i) /* Output registers */
+	:
+	: /* No clobbered registers */);
 
+	if ((i & 0x10000000) > 0) {
+		errno = -result;
+		return result;
+	}
 	return 0;
 }
 

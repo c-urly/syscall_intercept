@@ -31,8 +31,6 @@
 
 # see pattern_loop.in.S
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
@@ -41,22 +39,11 @@
 .text
 
 text_start:
-.L0:		jmp     dst0
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		jmp     dst1
-		int3
-		int3
-		int3
-		int3
-		loop    .L0
+.L0:	li r3, 0
+		li r3, 1
+		b dst0
+		cmpwi r3, -1
+		li r3, 2
+		b dst1
+		bdnz    .L0 # this instruction should not be touched
 text_end:

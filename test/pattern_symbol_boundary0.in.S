@@ -35,8 +35,6 @@
 # the previous instruction. In order to recognize this, it is necessary to
 # parse a symbol table of the object file being patched.
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
@@ -48,14 +46,14 @@
 .text
 
 text_start:
-		xor     rax, rax
-		mov     rax, 1
+		li     r3, 0
+		li     r3, 1
 		nop
-dummy_symbol:	syscall
-		cmp     rax, -1
-		mov     rax, 2
+dummy_symbol:	sc
+		cmpwi    r3, -1
+		li     r3, 2
 		.size dummy_symbol, .-dummy_symbol
-		syscall
-		inc     rax
-		inc     rax
+		sc
+		addi     r3,r3, 1
+		addi     r3,r3, 1
 text_end:

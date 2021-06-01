@@ -34,7 +34,7 @@
 # Patching is expected to fail.
 #
 
-.intel_syntax noprefix
+
 
 .global text_start;
 .global text_end;
@@ -44,16 +44,16 @@
 .text
 
 text_start:
-		mov     rax, 1
-		mov     rax, 1
-		mov     rax, 1
-		mov     rax, 1
-		jmp     0f
+		li     0, 1
+		li     0, 1
+		li     0, 1
+		li     0, 1
+		b     0f
 		nop
-		syscall
-		jmp     0f
-		cmp     rax, -1
-		cmp     rax, -1
-		cmp     rax, -1
-0:		cmp     rax, -1
+		sc
+		b     0f
+		cmpwi     0, -1
+		cmpwi     0, -1
+		cmpwi     0, -1
+0:		cmpwi     0, -1
 text_end:

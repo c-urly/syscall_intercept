@@ -33,8 +33,6 @@
 # A syscall instruction is at a jump destination in this code. The corresponding
 # jump is a symbol.
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
@@ -44,18 +42,18 @@
 #include "mock_trampoline_table.S"
 
 .text
-
 text_start:
-		xor     rax, rax
-		mov     rax, 1
-		nop
-dummy_symbol:	not     rax
-		jmp     0f
-		cmp     rax, -1
-		mov     rax, 2
-		.size dummy_symbol, .-dummy_symbol
-		nop
-0:		syscall
-		inc     rax
-		inc     rax
+        li r3, 0
+        li r3, 1
+        nop
+dummy_symbol:
+        neg      r3, r3
+        b     0f
+        cmpwi r3, -1
+        li r3, 2
+        .size dummy_symbol, .-dummy_symbol
+        nop
+0:		sc
+        addi r3, r3, 1
+        addi r3, r3, 1
 text_end:

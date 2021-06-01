@@ -35,8 +35,6 @@
 # can not be overritten, as the mov instruction followin it is
 # a jump destination.
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
@@ -45,14 +43,14 @@
 .text
 
 text_start:
-		xor     rax, rax
-		mov     rax, 1
-		jmp     0f
-		cmp     rax, -1
-		cmp     rax, -1
-		cmp     rax, -1
+		li r3, 0
+		li r3, 1
+		b     0f
+		cmpwi r3, -1
+		cmpwi r3, -1
+		cmpwi r3, -1
 		nop
-0:		mov     rax, 2
-		syscall
-		cmp     rax, -1
+0:		li r3, 2
+		sc
+		cmpwi r3, -1
 text_end:

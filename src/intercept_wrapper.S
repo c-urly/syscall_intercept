@@ -33,6 +33,48 @@
 /*
  * intercept_wrapper.s -- see asm_wrapper.md
  */
+// Helpers
+#define r12 12
+#define r1 1
+#define r0 0
+#define r3 3
+#define f0 0
+#define r4 4
+#define r2 2
+#define r10 10
+#define r16 16
+#define r31 31
+#define r30 30
+#define r15 15
+
+// Helpers
+
+#define NR_GPR		32
+#define NR_SPR		4
+
+#define SAVE_AREA	((NR_GPR + NR_SPR) * 8)
+#define CALLER_FRAME	376
+
+#define STACK_FRAME	SAVE_AREA
+
+#define CCR_SAVE	(CALLER_FRAME)
+#define LR_SAVE		(CCR_SAVE + 8)
+#define CTR_SAVE	(LR_SAVE  + 8)
+#define XER_SAVE	(CTR_SAVE + 8)
+#define GPR_SAVE(n)	(XER_SAVE + 8 + (8 * n))
+
+
+#define SAVE_GPR(n)	std n,GPR_SAVE(n)(r1)
+#define REST_GPR(n)	ld  n,GPR_SAVE(n)(r1)
+
+// Load a 64 bit immediate into a register
+#define LOAD_REG_IMMEDIATE(reg,expr)	\
+	lis     reg,0;	\
+	ori     reg,reg,(expr)@higher;	\
+	rldicr  reg,reg,32,31;		\
+	oris    reg,reg,(expr)@high;	\
+	ori     reg,reg,(expr)@l;
+
 
 /* the function in this file */
 .global intercept_wrapper
@@ -49,184 +91,124 @@
 .hidden intercept_routine_post_clone
 .type intercept_routine_post_clone, @function
 
-/* The boolean indicating whether YMM registers must saved */
-.global intercept_routine_must_save_ymm
-.hidden intercept_routine_must_save_ymm
-
 .text
 
-/*
- * Local stack layout:
- *
- * 0x448(%rsp)  -- return address, to the generated asm wrapper
- * Arguments recieved on stack:
- * 0x450(%rsp)  -- original value of rsp
- * 0x458(%rsp)  -- pointer to a struct patch_desc instance
- * Locals on stack:
- * 0xe8(%rsp) - 0x168(%rsp) -- saved GPRs
- * 0x200(%rsp) - 0x400(%rsp) -- saved SIMD registers
- *
- * A pointer to these saved register is passed to intercept_routine, so the
- * layout of `struct context` must match this part of the stack layout.
- *
- * Other arguments:
- * %rcx  -- which C function to call
- */
+
 intercept_wrapper:
 	.cfi_startproc
 
-	/*
-	 * Stack size used locally: 0x448 bytes.
-	 *
-	 * This size assumes the stack pointer was correctly aligned before
-	 * executing the call instruction calling this function. The return
-	 * address pushed to the stack uses 8 bytes. This gives the equation:
-	 *
-	 * new_rsp = original_rsp - 8 - 0x448 == original_rsp - 0x450
-	 * The number 0x450 is a multiple of 16, so the stack is still correctly
-	 * aligned. It is very easy to forget about this when making changes to this
-	 * code.
-	 */
-	subq        $0x448, %rsp
-	.cfi_def_cfa_offset 0x0
+	stdu    r1,-STACK_FRAME(r1)
+    SAVE_GPR(0)
+    mflr    r0
+    std     r0,LR_SAVE(r1)
+    mfcr    r0
+    std     r0,CCR_SAVE(r1)
+    mfctr   r0
+    std     r0,CTR_SAVE(r1)
+    mfxer   r0
+    std     r0,XER_SAVE(r1)
+    REST_GPR(0)
+    SAVE_GPR(1)
+    SAVE_GPR(2)
+    SAVE_GPR(3)
+    SAVE_GPR(4)
+    SAVE_GPR(5)
+    SAVE_GPR(6)
+    SAVE_GPR(7)
+    SAVE_GPR(8)
+    SAVE_GPR(9)
+    SAVE_GPR(10)
+    SAVE_GPR(11)
+    SAVE_GPR(12)
+    SAVE_GPR(13)
+    SAVE_GPR(14)
+    SAVE_GPR(15)
+    SAVE_GPR(16)
+    SAVE_GPR(17)
+    SAVE_GPR(18)
+    SAVE_GPR(19)
+    SAVE_GPR(20)
+    SAVE_GPR(21)
+    SAVE_GPR(22)
+    SAVE_GPR(23)
+    SAVE_GPR(24)
+    SAVE_GPR(25)
+    SAVE_GPR(26)
+    SAVE_GPR(27)
+    SAVE_GPR(28)
+    SAVE_GPR(29)
+    SAVE_GPR(30)
+    SAVE_GPR(31)
 
-	/* Save all GPRs on the stack */
-	movq        %rax, 0x160 (%rsp)
-	.cfi_offset 0, 0x160
-	movq        %rdx, 0x158 (%rsp)
-	.cfi_offset 1, 0x158
-	/* rcx is already clobbered, no reason to save it */
-	movq        %rbx, 0x150 (%rsp)
-	.cfi_offset 3, 0x150
-	movq        %rsi, 0x148 (%rsp)
-	.cfi_offset 4, 0x148
-	movq        %rdi, 0x140 (%rsp)
-	.cfi_offset 5, 0x140
-	movq        %rbp, 0x138 (%rsp)
-	.cfi_offset 6, 0x138
-	movq        0x450 (%rsp), %r11 /* fetch original value of rsp */
-	movq        %r11, 0x130 (%rsp)
-	.cfi_offset 7, 0x130
-	movq        %r8, 0x128 (%rsp)
-	.cfi_offset 8, 0x128
-	movq        %r9, 0x120 (%rsp)
-	.cfi_offset 9, 0x120
-	movq        %r10, 0x118 (%rsp)
-	.cfi_offset 10, -0x118
-	/* r11 is already clobbered, no reason to save it */
-	movq        %r12, 0x110 (%rsp)
-	.cfi_offset 12, 0x110
-	movq        %r13, 0x108 (%rsp)
-	.cfi_offset 13, 0x108
-	movq        %r14, 0x100 (%rsp)
-	.cfi_offset 14, 0x100
-	movq        %r15, 0xf8 (%rsp)
-	.cfi_offset 15, 0xf8
-	movq        0x458 (%rsp), %r11 /* fetch pointer to patch_desc */
-	movq        %r11, 0xe8 (%rsp)
-	movq        (%r11), %r11 /* fetch original value of rip */
-	movq        %r11, 0xf0 (%rsp)
-	.cfi_offset 16, 0xf0
 
-	movb        intercept_routine_must_save_ymm (%rip), %al
-	test        %al, %al
-	jz          0f
+    cmpdi r12 ,1
+    beq 0f
+    addi r3, r1, 368 #368
+    bl intercept_routine
+    b 1f
 
-	/*
-	 * Save the YMM registers.
-	 * Use vmovups. Must not use vmovaps, since 32 byte alignment is not
-	 * guaranteed.
-	 * One could just align the stack for this, but that would need
-	 * more explanation in comments in other places about why overaligned
-	 * stack is needed.
-	 */
-	vmovups     %ymm0, 0x3c0 (%rsp)
-	vmovups     %ymm1, 0x380 (%rsp)
-	vmovups     %ymm2, 0x340 (%rsp)
-	vmovups     %ymm3, 0x300 (%rsp)
-	vmovups     %ymm4, 0x2c0 (%rsp)
-	vmovups     %ymm5, 0x280 (%rsp)
-	vmovups     %ymm6, 0x240 (%rsp)
-	vmovups     %ymm7, 0x200 (%rsp)
-	jmp         1f
-
-0:
-	/* Save the XMM registers. */
-	movaps      %xmm0, 0x3c0 (%rsp)
-	movaps      %xmm1, 0x380 (%rsp)
-	movaps      %xmm2, 0x340 (%rsp)
-	movaps      %xmm3, 0x300 (%rsp)
-	movaps      %xmm4, 0x2c0 (%rsp)
-	movaps      %xmm5, 0x280 (%rsp)
-	movaps      %xmm6, 0x240 (%rsp)
-	movaps      %xmm7, 0x200 (%rsp)
+0:  addi r3, r1, 368  // Put in R3 the @ of the context
+    bl intercept_routine_post_clone
+    nop
 
 1:
-	/* argument passed to intercept_routine */
-	leaq        0xe8 (%rsp), %rdi
-
-	cmp         $0x1, %rcx /* which function should be called? */
-	je          0f
-	call        intercept_routine
-	jmp         1f
-0:	call        intercept_routine_post_clone
-1:
 	/*
-	 * At this point, the return value of the C
-	 * function (a struct wrapper_ret instance) is in rax, rdx.
-	 *
-	 * This function doesn't use these values for anything, just
-	 * forwards them to the higher level wrapper function, generated
-	 * from the template.
-	 */
+     * At this point, the return value of the C
+     * function (a struct wrapper_ret instance) is in r3, r4
+     *
+     * This function doesn't use these values for anything, just
+     * forwards them to the higher level wrapper function, generated
+     * from the template.
+     */
 
-	movq        %rdx, %r11
-	/*
+
+    /*
 	 * At this point, the return values of this asm function
-	 * are in rax, r11.
+	 * are in r3, r4.
 	 *
 	 * Restore the other registers, and return.
 	 */
 
-	movb        intercept_routine_must_save_ymm (%rip), %dl
-	test        %dl, %dl
-	jz          0f
-
-	vmovups     0x3c0 (%rsp), %ymm0
-	vmovups     0x380 (%rsp), %ymm1
-	vmovups     0x340 (%rsp), %ymm2
-	vmovups     0x300 (%rsp), %ymm3
-	vmovups     0x2c0 (%rsp), %ymm4
-	vmovups     0x280 (%rsp), %ymm5
-	vmovups     0x240 (%rsp), %ymm6
-	vmovups     0x200 (%rsp), %ymm7
-	jmp         1f
-
-0:
-	movaps      0x3c0 (%rsp), %xmm0
-	movaps      0x380 (%rsp), %xmm1
-	movaps      0x340 (%rsp), %xmm2
-	movaps      0x300 (%rsp), %xmm3
-	movaps      0x2c0 (%rsp), %xmm4
-	movaps      0x280 (%rsp), %xmm5
-	movaps      0x240 (%rsp), %xmm6
-	movaps      0x200 (%rsp), %xmm7
-
-1:
-	movq        0x158 (%rsp), %rdx
-	movq        0x150 (%rsp), %rbx
-	movq        0x148 (%rsp), %rsi
-	movq        0x140 (%rsp), %rdi
-	movq        0x138 (%rsp), %rbp
-	movq        0x128 (%rsp), %r8
-	movq        0x120 (%rsp), %r9
-	movq        0x118 (%rsp), %r10
-	movq        0x110 (%rsp), %r12
-	movq        0x108 (%rsp), %r13
-	movq        0x100 (%rsp), %r14
-	movq        0xf8 (%rsp), %r15
-
-	addq        $0x448, %rsp
-
-	retq
+    ld      r0,XER_SAVE(r1)
+    mtxer   r0
+    ld      r0,CTR_SAVE(r1)
+    mtctr   r0
+    ld      r0,CCR_SAVE(r1)
+    mtcr    r0
+    ld      r0,LR_SAVE(r1)
+    mtlr    r0
+    REST_GPR(0)
+    REST_GPR(1)
+    REST_GPR(2)
+    #        REST_GPR(3) # Result in r3
+    #        REST_GPR(4) # Result in r4
+    REST_GPR(5)
+    REST_GPR(6)
+    REST_GPR(7)
+    REST_GPR(8)
+    REST_GPR(9)
+    REST_GPR(10)
+    REST_GPR(11)
+    REST_GPR(12)
+    REST_GPR(13)
+    REST_GPR(14)
+    REST_GPR(15)
+    REST_GPR(16)
+    REST_GPR(17)
+    REST_GPR(18)
+    REST_GPR(19)
+    REST_GPR(20)
+    REST_GPR(21)
+    REST_GPR(22)
+    REST_GPR(23)
+    REST_GPR(24)
+    REST_GPR(25)
+    REST_GPR(26)
+    REST_GPR(27)
+    REST_GPR(28)
+    REST_GPR(29)
+    REST_GPR(30)
+    REST_GPR(31)
+    addi    r1,r1,STACK_FRAME
+    blr
 	.cfi_endproc

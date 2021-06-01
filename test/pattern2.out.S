@@ -31,8 +31,6 @@
 
 # see pattern2.in.S
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
@@ -41,25 +39,11 @@
 .text
 
 text_start:
-		jmp     dst0
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		jmp     dst1
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
+li     r3, 0
+li     r3, 1
+b dst0
+cmpdi r3, -1
+li     r3, 2
+b dst1
+cmpdi r3, -1
 text_end:
