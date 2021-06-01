@@ -722,7 +722,7 @@ intercept_routine(struct context *context)
 					desc.args[3],
 					desc.args[4],
 					desc.args[5]);
-		unsigned long long i;
+			unsigned long long i;
 		__asm__ volatile
 		(
 		"mfcr %0\n\t"
@@ -730,6 +730,8 @@ intercept_routine(struct context *context)
 		:
 		: /* No clobbered registers */);
 		context->ccr = i;
+		int error = syscall_error_code(result);
+		if (error > 0) result = -error;
 	}
 
 		/*
