@@ -99,7 +99,7 @@ syscall_error_code(long result)
 	: /* No clobbered registers */);
 
 	if ((i & 0x10000000) > 0) {
-		errno = -result;
+		errno = result;
 		return result;
 	}
 	return 0;
@@ -117,6 +117,20 @@ syscall_error_code(long result)
 int syscall_hook_in_process_allowed(void);
 
 #ifdef __cplusplus
+}
+/* Wrapper to call syscall + error code */
+template < class... Args >
+inline long syscall_no_intercept_wrapper(long syscall_number, Args ... args) {
+
+	long result;
+	int error_sc = 0;
+	result = syscall_no_intercept(syscall_number, args...);
+	error_sc = syscall_error_code(result);
+	if (error_sc != 0) {
+		return -1;
+	}
+	return result;
+
 }
 #endif
 

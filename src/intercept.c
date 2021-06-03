@@ -672,6 +672,7 @@ struct wrapper_ret
 intercept_routine(struct context *context)
 {
 	long result;
+	int error = 0;
 	int forward_to_kernel = true;
 	struct syscall_desc desc;
 	struct patch_desc *patch = context->patch_desc;
@@ -730,8 +731,8 @@ intercept_routine(struct context *context)
 		:
 		: /* No clobbered registers */);
 		context->ccr = i;
-		int error = syscall_error_code(result);
-		if (error > 0) result = -error;
+		error = syscall_error_code(result);
+		// if (error > 0) result = -error;
 	}
 
 		/*
@@ -750,7 +751,7 @@ intercept_routine(struct context *context)
 				result);
 	}
 
-	if (result == -1) {
+	if (error > 0) {
 		intercept_log_syscall(patch, &desc, KNOWN, -errno);
 	} else
 		intercept_log_syscall(patch, &desc, KNOWN, result);
