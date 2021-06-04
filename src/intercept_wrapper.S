@@ -41,6 +41,7 @@
 #define f0 0
 #define r4 4
 #define r2 2
+#define r5 5
 #define r10 10
 #define r16 16
 #define r31 31
@@ -141,7 +142,7 @@ intercept_wrapper:
     SAVE_GPR(31)
 
 
-    cmpdi r12 ,1
+    cmpdi r30 ,1
     beq 0f
     addi r3, r1, 368 #368
     bl intercept_routine

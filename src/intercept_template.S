@@ -100,24 +100,16 @@ std r0, 16(r1)
 mfctr r0			# CR is not stored as needs to be recovered
 std r0, 24(r1)
 std r2, 40(r1)
-std  r3, 48(r1)		# This is not needed
-std  r4, 56(r1)
-std  r5, 64(r1)
+std r3, 48(r1)		# This is not needed
+std r4, 56(r1)
+std r30, 64(r1)
 ld r0,72(r1)		# Reload r0, syscall number
-std  r6, 80(r1)
-std  r10,88(r1)
-std r11,96(r1)
-std r12,104(r1)
 stdu r1, -392(r1)   # Add extra space for next steps
 .endm
 
 .macro intercept_asm_wrapper_restore_regs
 # We need a addi r1,r1, 392 we will do externally
-ld r12,104(r1)
-ld r11,96(r1)
-ld r10,88(r1)
-ld r6, 80(r1)
-ld r5, 64(r1)
+ld r30, 64(r1)
 ld r4, 56(r1)
 #    ld r3, 48(r1)  // Results do not restore
 ld r2, 40(r1)
@@ -139,20 +131,19 @@ addi r1,r1, 120
 
 intercept_asm_wrapper_tmpl:
 	intercept_asm_wrapper_save_regs
-	li r12, 0 # Intercept routine in r12
+	li r30, 0 # Intercept routine in r30
 intercept_asm_wrapper_r2_load_addr:
 # We need to save dnamically the r2 (TOC) to allow global variable
 	LOAD_REG_IMMEDIATE(r2, 0)
 k: # We don't need to reload the R2 (clones)
 intercept_asm_wrapper_patch_desc_addr:
-	LOAD_REG_IMMEDIATE(r11,0)
-	std r11, 80(r1)	 # We store the address in the stack
+	LOAD_REG_IMMEDIATE(r4,0)
+	std r4, 80(r1)	 # We store the address in the stack
 intercept_asm_wrapper_wrapper_level1_addr:
-    nop             // TODO: Do we need this nop ?
-    LOAD_REG_IMMEDIATE(r11,0)
-    mtlr r11
+    LOAD_REG_IMMEDIATE(r4,0)
+    mtlr r4
+    ld r4, 56+392(r1)
     blrl
-    nop
 	/*
 	 *
 	 * If r4 is zero, r3 contains a syscall number, and that syscall
@@ -166,8 +157,6 @@ intercept_asm_wrapper_wrapper_level1_addr:
     beq 3f
     cmpdi r4,2
     beq 1f
-    nop         // TODO: Check this nop
-
 1:
 	/* execute the clone syscall in its original context */
 	ld r0, 88(r1)
@@ -176,8 +165,8 @@ intercept_asm_wrapper_wrapper_level1_addr:
 	ld r3, 48(r1) // We need to reload r3, syscall number
 	intercept_asm_wrapper_restore_regs
 	sc
-	li r12, 1
 	intercept_asm_wrapper_save_regs // Save regs
+    li r30, 1
 	b intercept_asm_wrapper_r2_load_addr // Reload the TOC for child
 2:
 	ld r0, 88(r1)
@@ -195,6 +184,7 @@ intercept_asm_wrapper_wrapper_level1_addr:
 e:
     LOAD_REG_IMMEDIATE(r4,0) // We need to jump to the syscall again
     mtctr r4
+    ld r4, 56(r1)
     bctr
 intercept_asm_wrapper_tmpl_end:
 	/*
