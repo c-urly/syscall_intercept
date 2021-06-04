@@ -122,9 +122,15 @@ addi r1,r1, 48
 .endm
 
 /* Helper to load a 64 bit immediate into a register */
-#define LOAD_REG_IMMEDIATE(reg,expr)		\
+/*#define LOAD_REG_IMMEDIATE(reg,expr)		\
  	lis     reg,(expr)@highest;		\
  	ori     reg,reg,(expr)@higher;	\
+ 	rldicr  reg,reg,32,31;		\
+	oris    reg,reg,(expr)@high;	\
+ 	ori     reg,reg,(expr)@l;
+*/
+#define LOAD_REG_IMMEDIATE(reg,expr)		\
+ 	li     reg,(expr)@higher;		\
  	rldicr  reg,reg,32,31;		\
 	oris    reg,reg,(expr)@high;	\
  	ori     reg,reg,(expr)@l;

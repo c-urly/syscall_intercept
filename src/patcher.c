@@ -320,9 +320,9 @@ init_patcher(void)
 void
 create_movabs_p1(unsigned char *dst, uintptr_t loc)
 {
-	*(unsigned *)dst |= ((loc >> 48) & 0xFFFF);
+//	*(unsigned *)dst |= ((loc >> 48) & 0xFFFF);
 
-	dst += 4;
+//	dst += 4;
 	*(unsigned *)dst |= ((loc >> 32) & 0xFFFF);
 
 	dst += 8;
@@ -334,31 +334,6 @@ create_movabs_p1(unsigned char *dst, uintptr_t loc)
 	*(unsigned *)dst |= ((loc) & 0xFFFF);
 }
 
-
-void
-create_nop(unsigned char *dst, unsigned i)
-{
-	if (i == 0) {
-		dst += 8;
-		*(unsigned *)dst = 0x60000000;
-		dst += 4;
-		*(unsigned *)dst = 0x60000000;
-		dst -= 12;
-
-	} else if (i == 1) {
-
-		*(unsigned *)dst = 0x60000000;
-		dst += 4;
-		*(unsigned *)dst = 0x60000000;
-		dst += 4;
-		*(unsigned *)dst = 0x60000000;
-		dst -= 8;
-	}
-
-
-	dst -= 20;
-
-}
 
 /*
  * create_wrapper
@@ -390,14 +365,14 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 	create_movabs_p1(*dst + o_wrapper_level1_addr,
 		(uintptr_t)&intercept_wrapper);
 
-	*dst += asm_wrapper_tmpl_size - 8 * 4;
+	*dst += asm_wrapper_tmpl_size - 7 * 4;
 	if (check_relative_jump(*dst, patch->return_address)) {
 		create_jump(1, *dst, patch->return_address);
 		*dst += 4;
 	} else {
 		debug_dump("Check relative NEED A LONG JUMP => TOC?!\n");
 		create_movabs_p1(*dst, (uintptr_t)patch->return_address);
-		*dst += 8 * 4;
+		*dst += 7 * 4;
 	}
 }
 

@@ -181,8 +181,8 @@ intercept_wrapper:
     REST_GPR(0)
     REST_GPR(1)
     REST_GPR(2)
-    #        REST_GPR(3) # Result in r3
-    #        REST_GPR(4) # Result in r4
+#            REST_GPR(3) # Result in r3
+#       REST_GPR(4) # Result in r4
     REST_GPR(5)
     REST_GPR(6)
     REST_GPR(7)
