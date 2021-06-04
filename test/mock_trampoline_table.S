@@ -78,7 +78,7 @@ k0:		nop
         nop
         nop
         nop
-        nop
+
 
 dst1:		b     k1
 k1:		nop
@@ -88,7 +88,7 @@ k1:		nop
         nop
         nop
         nop
-        nop
+
 dst2:		b     k2
 k2:		nop
         nop
@@ -97,7 +97,7 @@ k2:		nop
         nop
         nop
         nop
-        nop
+
 dst3:		b     k3
 k3:     nop
         nop
@@ -106,5 +106,5 @@ k3:     nop
         nop
         nop
         nop
-        nop
+
 trampoline_table_end:

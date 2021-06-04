@@ -91,34 +91,34 @@
  */
 
 /* Some helpers to save registers */
-// TODO: Compact this part
+
 .macro intercept_asm_wrapper_save_regs
-stdu r1, -120(r1)	# Stack space for registers
-std r0,72(r1)
+stdu r1, -48(r1)	# Stack space for registers
+std r0,40(r1)
 mflr r0
-std r0, 16(r1)
+std r0, 0(r1)
 mfctr r0			# CR is not stored as needs to be recovered
-std r0, 24(r1)
-std r2, 40(r1)
-std r3, 48(r1)		# This is not needed
-std r4, 56(r1)
-std r30, 64(r1)
-ld r0,72(r1)		# Reload r0, syscall number
+std r0, 8(r1)
+std r2, 16(r1)
+std r3, 24(r1)		# This is not needed
+std r4, 32(r1)
+std r30, 48(r1)
+ld r0,40(r1)		# Reload r0, syscall number
 stdu r1, -392(r1)   # Add extra space for next steps
 .endm
 
 .macro intercept_asm_wrapper_restore_regs
 # We need a addi r1,r1, 392 we will do externally
-ld r30, 64(r1)
-ld r4, 56(r1)
-#    ld r3, 48(r1)  // Results do not restore
-ld r2, 40(r1)
-ld r0, 24(r1)
+ld r30, 48(r1)
+ld r4, 32(r1)
+#    ld r3, 24(r1)  // Results do not restore
+ld r2, 16(r1)
+ld r0, 8(r1)
 mtctr r0
-ld r0, 16(r1)
+ld r0, 0(r1)
 mtlr r0
-ld r0, 72(r1)
-addi r1,r1, 120
+ld r0, 40(r1)
+addi r1,r1, 48
 .endm
 
 /* Helper to load a 64 bit immediate into a register */
@@ -142,7 +142,7 @@ intercept_asm_wrapper_patch_desc_addr:
 intercept_asm_wrapper_wrapper_level1_addr:
     LOAD_REG_IMMEDIATE(r4,0)
     mtlr r4
-    ld r4, 56+392(r1)
+    ld r4, 32+392(r1)
     blrl
 	/*
 	 *
@@ -162,7 +162,7 @@ intercept_asm_wrapper_wrapper_level1_addr:
 	ld r0, 88(r1)
 	mtcr r0     // We restore the syscall CR (error code)
 	addi r1, r1, 392
-	ld r3, 48(r1) // We need to reload r3, syscall number
+	ld r3, 24(r1) // We need to reload r3, syscall number
 	intercept_asm_wrapper_restore_regs
 	sc
 	intercept_asm_wrapper_save_regs // Save regs
@@ -172,7 +172,7 @@ intercept_asm_wrapper_wrapper_level1_addr:
 	ld r0, 88(r1)
 	mtcr r0
 	addi r1, r1, 392
-	ld r3, 48(r1)
+	ld r3, 24(r1)
 	intercept_asm_wrapper_restore_regs
 	sc
 	b e
@@ -184,7 +184,7 @@ intercept_asm_wrapper_wrapper_level1_addr:
 e:
     LOAD_REG_IMMEDIATE(r4,0) // We need to jump to the syscall again
     mtctr r4
-    ld r4, 56(r1)
+    ld r4, 32(r1)
     bctr
 intercept_asm_wrapper_tmpl_end:
 	/*

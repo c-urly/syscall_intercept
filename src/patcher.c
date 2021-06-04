@@ -81,7 +81,7 @@
 #include <stdio.h>
 
 /* The size of a trampoline jump */
-enum { TRAMPOLINE_SIZE = 28 + 8 };
+enum { TRAMPOLINE_SIZE = 28 + 8 - 8};
 
 static void create_wrapper(struct patch_desc *patch, unsigned char **dst);
 
@@ -121,17 +121,17 @@ create_absolute_jumptr(unsigned char *from, void *to)
 	uintptr_t delta32 = (uintptr_t)to;
 	*(unsigned *)from = (unsigned)0xf9e1fff8;
 	from += 4;
-	*(unsigned *)from = (unsigned)0x3DE00000;
-	*(unsigned *)from |= (((((delta32 >> 48))))& 0xFFFF);
-	from += 4;
-	*(unsigned *)from = (unsigned)0x61EF0000;
+	*(unsigned *)from = (unsigned)0x39E00000; // 39 (li) 3D (lis)
+//	*(unsigned *)from |= (((((delta32 >> 48))))& 0xFFFF);
+//	from += 4;
+//	*(unsigned *)from = (unsigned)0x61EF0000;
 	*(unsigned *)from |= (((((delta32 >> 32))))& 0xFFFF);
 	from += 4;
 
 	*(unsigned *)from = (unsigned)0x79EF07C6;
 
 	from += 4;
-	*(unsigned *)from = (unsigned)0x65EF0000;
+	*(unsigned *)from = (unsigned)0x65EF0000; // 61 ori 65 oris
 	*(unsigned *)from |= (((((delta32 >> 16))))& 0xFFFF);
 	from += 4;
 	*(unsigned *)from = (unsigned)0x61EF0000;
