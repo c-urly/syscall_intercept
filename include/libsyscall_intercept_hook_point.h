@@ -100,8 +100,20 @@ syscall_error_code(long result)
 
 	if ((i & 0x10000000) > 0) {
 		errno = result;
+
+		__asm__ volatile("mtcr %0\n\t"
+		:   /* Output registers */
+		: "r" (i)
+		: /* No clobbered registers */);
+
 		return result;
 	}
+
+	__asm__ volatile("mtcr %0\n\t"
+	:  /* Output registers */
+	: "r" (i)
+	: /* No clobbered registers */);
+
 	return 0;
 }
 
