@@ -114,7 +114,7 @@ struct context {
 	long x[20];
 	long d8to15[8];
 	struct patch_desc *patch_desc;
-	long _pad;
+	long _pad[2];
 	long lr;
 };
 

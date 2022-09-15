@@ -116,13 +116,16 @@ create_b(unsigned char *from, void *to)
 
 	debug_dump("%p: svc -> b %ld\t# %p\n", from, delta, to);
 
-	const ptrdiff_t MAX_OFFSET = 1 << 28;
+	const ptrdiff_t MAX_OFFSET = 1 << 27;
 
 	if ((delta >= MAX_OFFSET) || (delta <= -MAX_OFFSET) ||
 		((delta & 0x3) != 0))
 		xabort("create_b distance check");
 
 	*(uint32_t *)from = 0x14000000 | ((delta >> 2) & ((1 << 26) - 1));
+
+	// invalidate cache
+	__builtin___clear_cache(from, from + 4);
 }
 
 /*
@@ -173,8 +176,10 @@ static ptrdiff_t o_wrapper_level1_addr;
 static bool
 is_asm_wrapper_space_full(void)
 {
+	const unsigned char *end_wrapper_space = round_down_address(
+		asm_wrapper_space + sizeof(asm_wrapper_space));
 	return next_asm_wrapper_space + tmpl_size + 256 >
-			asm_wrapper_space + sizeof(asm_wrapper_space);
+			end_wrapper_space;
 }
 
 
@@ -243,6 +248,10 @@ create_wrapper(struct patch_desc *patch)
 	create_mov_x6(dst + o_patch_desc_addr, (uintptr_t)patch);
 	create_mov_x6(dst + o_wrapper_level1_addr,
 				(uintptr_t)&intercept_wrapper);
+
+	// invalidate cache
+	__builtin___clear_cache(dst, dst + tmpl_size);
+
 	dst += tmpl_size;
 
 	create_b(dst, patch->return_address);
@@ -300,9 +309,14 @@ activate_patches(struct intercept_desc *desc)
 void
 mprotect_asm_wrappers(void)
 {
+	void *start_addr = round_down_address(
+		asm_wrapper_space + PAGE_SIZE);
+	size_t size = (uintptr_t)round_down_address(
+		asm_wrapper_space + sizeof(asm_wrapper_space))
+		- (uintptr_t)start_addr;
 	mprotect_no_intercept(
-	    round_down_address(asm_wrapper_space + PAGE_SIZE),
-	    sizeof(asm_wrapper_space) - PAGE_SIZE,
+	    start_addr,
+	    size,
 	    PROT_READ | PROT_EXEC,
 	    "mprotect_asm_wrappers PROT_READ | PROT_EXEC");
 }
