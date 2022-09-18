@@ -69,8 +69,13 @@ intercept_asm_wrapper_tmpl:
 	svc #0
 	b intercept_asm_wrapper_tmpl_end
 0:
-	# save
-	stp	lr, x6, [sp, #-16]!
+	stp lr, x6, [sp, #-16]!
+	mov x6, sp
+	# allocate for red zone
+	sub sp, sp, #0x80
+	sub sp, sp, #16
+	# save sp on stack
+	str x6, [sp, #8]
 intercept_asm_wrapper_patch_desc_addr:
 	# load patch_desc address
 	movz x6, 0
@@ -78,7 +83,7 @@ intercept_asm_wrapper_patch_desc_addr:
 	movk x6, 0, lsl 32
 	movk x6, 0, lsl 48
 	# save patch_desc pointer on stack
-	str	x6, [sp, #-16]!
+	str	x6, [sp]
 intercept_asm_wrapper_wrapper_level1_addr:
 	# load asm_wrapper address
 	movz x6, 0
@@ -88,8 +93,9 @@ intercept_asm_wrapper_wrapper_level1_addr:
 	# call asm_wrapper
 	blr x6
 	# restore
-	add sp, sp, #16
-	ldp lr, xzr, [sp], #16
+	ldr x6, [sp, #8]
+	mov sp, x6
+	ldp lr, x6, [sp], #16
 intercept_asm_wrapper_tmpl_end:
 	/*
 	 * This template must be appended here with a

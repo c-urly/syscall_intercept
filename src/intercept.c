@@ -114,8 +114,8 @@ struct context {
 	long x[20];
 	long d8to15[8];
 	struct patch_desc *patch_desc;
-	long _pad[2];
-	long lr;
+	// long _pad;
+	// long lr;
 };
 
 struct wrapper_ret {
@@ -131,7 +131,7 @@ void dump_context(struct context *context) {
 	for (int i = 0; i < 8; ++i) {
 		debug_dump("d%d\t= %16lx\n", i + 8, context->d8to15[i]);
 	}
-	debug_dump("lr\t= %16lx\n", context->lr);
+	// debug_dump("lr\t= %16lx\n", context->lr);
 	debug_dump("patch_desc\t= %16lx\n", (long)context->patch_desc);
 	debug_dump("======== context end ========\n");
 }

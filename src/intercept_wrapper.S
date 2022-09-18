@@ -70,7 +70,7 @@
  */
 intercept_wrapper:
     # Recover x6
-    ldr x6, [sp, #0x18]
+    # ldr x6, [sp, #8]
     # Down stack pointer
     sub sp, sp, #0xe0
     # Save caller-saved general registers
