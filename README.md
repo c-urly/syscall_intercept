@@ -1,8 +1,8 @@
 # syscall_intercept
 
-[![Build Status](https://travis-ci.org/pmem/syscall_intercept.svg)](https://travis-ci.org/pmem/syscall_intercept)
+<!-- [![Build Status](https://travis-ci.org/pmem/syscall_intercept.svg)](https://travis-ci.org/pmem/syscall_intercept)
 [![Coverage Status](https://codecov.io/github/pmem/syscall_intercept/coverage.svg)](https://codecov.io/gh/pmem/syscall_intercept)
-[![Coverity Scan Build Status](https://scan.coverity.com/projects/12890/badge.svg)](https://scan.coverity.com/projects/syscall_intercept)
+[![Coverity Scan Build Status](https://scan.coverity.com/projects/12890/badge.svg)](https://scan.coverity.com/projects/syscall_intercept) -->
 
 Userspace syscall intercepting library.
 
@@ -14,15 +14,18 @@ Userspace syscall intercepting library.
 
 ## Build dependencies ##
 
-# Local build dependencies #
+## Local build dependencies ##
 
- * C99 toolchain -- tested with recent versions of GCC and clang
+ * riscv toolchain -- will be tested with recent versions of GCC and clang in riscv environment
+ * qemu -- to run riscv binaries
+ * riscv-gdb -- for debugging
  * cmake
  * perl -- for checking coding style
- * pandoc -- for generating the man page
+ * pandoc -- for generating the man page 
 
-### Travis CI build dependencies ###
-
+## Travis CI build dependencies ##
+TBD
+<!-- 
 The travis builds use some scripts to generate a docker images, in which syscall_intercept is built/tested.
 These docker images are pushed to Dockerhub, to be reused in later travis builds.
 The scripts expect four environment variables to be set in the travis environment:
@@ -31,9 +34,11 @@ The scripts expect four environment variables to be set in the travis environmen
     should contain the string "pmem/syscall_intercept"
  * DOCKERHUB_USER - used for logging into Dockerhub
  * DOCKERHUB_PASSWORD - used for logging into Dockerhub
- * GITHUB_REPO - where the repository is available on github (e.g. "pmem/syscall_intercept" )
+ * GITHUB_REPO - where the repository is available on github (e.g. "pmem/syscall_intercept" ) -->
 
-### How to build ###
+# How to build #
+
+## In x86: ##
 
 Building libsyscall_intercept requires cmake.
 Example:
@@ -52,12 +57,11 @@ There is an install target. For now, all it does, is cp.
 make install
 ```
 
-Coming soon:
 ```sh
 make test
 ```
 
-# Synopsis #
+### Synopsis ###
 
 ```c
 #include <libsyscall_intercept_hook_point.h>
@@ -67,8 +71,11 @@ cc -lsyscall_intercept -fpic -shared source.c -o preloadlib.so
 
 LD_PRELOAD=preloadlib.so ./application
 ```
+## In RISC-V ##
+TBD
 
-##### Description: #####
+
+# Description: #
 
 The system call intercepting library provides a low-level interface
 for hooking Linux system calls in user space. This is achieved
@@ -126,7 +133,9 @@ This can also be queried by the user of the library:
 int syscall_hook_in_process_allowed(void);
 ```
 
-##### Example: #####
+# Example: #
+
+## In x86: ##
 
 ```c
 #include <libsyscall_intercept_hook_point.h>
@@ -174,10 +183,12 @@ $ cc example.c -lsyscall_intercept -fpic -shared -o example.so
 $ LD_LIBRARY_PATH=. LD_PRELOAD=example.so ls
 ls: reading directory '.': Operation not supported
 ```
+## In RISC-V ##
+TBD
 
 # Under the hood: #
 
-##### Assumptions: #####
+## Assumptions: ##
 In order to handle syscalls in user space, the library relies
 on the following assumptions:
 
@@ -189,13 +200,15 @@ memory space when the intercepting library is being initialized
 for the methods listed in this section
 - For some more basic assumptions, see the section on limitations.
 
-##### Disassembly: #####
-The library disassembles the text segment of the libc loaded
-into the memory space of the process it is initialized in. It
-locates all syscall instructions, and replaces each of them
-with a jump to a unique address. Since the syscall instruction
-of the x86_64 ISA occupies only two bytes, the method involves
-locating other bytes close to the syscall suitable for overwriting.
+## Disassembly: ##
+- The library disassembles the text segment of the libc loaded
+into the memory space of the process it is initialized in. 
+
+- It locates all syscall instructions, and replaces each of them
+with a jump to a unique address. 
+
+- Since the syscall instruction of the RISCV ISA occupies four bytes, we have to 
+locate bytes close(padding area) to the syscall suitable for overwriting.
 The destination of the jump (unique for each syscall) is a
 small routine, which accomplishes the following tasks:
 
@@ -204,15 +217,17 @@ preceded the syscall instruction, and was overwritten to
 make space for the jump instruction
 2. Saves the current state of all registers to the stack
 3. Translates the arguments (in the registers) from
-the Linux x86_64 syscall calling convention to the C ABI's
-calling convention used on x86_64
-4. Calls a function written in C (which in turn calls
+the Linux RISCV syscall calling convention to the C ABI's
+calling convention used on RISCV
+4. Calls a function(hook) written in C (which in turn calls
 the callback supplied by the library user)
 5. Loads the values from the stack back into the registers
 6. Jumps back to libc, to the instruction following the
 overwritten part
 
-##### In action: #####
+## In action: ##
+
+### In x86: ###
 
 *Simple hotpatching:*
 Replace a mov and a syscall instruction with a jmp instruction
@@ -268,10 +283,12 @@ Before:                         After:
                                 e1200: jmp 3f403 ________/
 
 ```
+### In RISCV ###
+TBD
 
 # Limitations: #
 * Only Linux is supported
-* Only x86\_64 is supported
+* Currently only x86\_64 is supported
 * Only tested with glibc, although perhaps it works
 with some other libc implementations as well
 * There are known issues with the following syscalls:
