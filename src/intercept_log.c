@@ -906,29 +906,29 @@ print_return_value(char *c, enum return_type type, long value)
  * Each syscall should be logged after being executed, so the result can be
  * logged as well.
  */
-// void
-// intercept_log_syscall(const struct patch_desc *patch,
-// 			const struct syscall_desc *desc,
-// 			enum intercept_log_result result_known, long result)
-// {
-// 	if (log_fd < 0)
-// 		return;
+void
+intercept_log_syscall(const struct patch_desc *patch,
+			const struct syscall_desc *desc,
+			enum intercept_log_result result_known, long result)
+{
+	if (log_fd < 0)
+		return;
 
-// 	char buffer[0x1000];
-// 	char *c = buffer;
+	char buffer[0x1000];
+	char *c = buffer;
 
-// 	/* prefix: "/lib/libc.so 0x1234 -- " */
-// 	c = print_cstr(c, patch->containing_lib_path);
-// 	c = print_cstr(c, " ");
-// 	c = print_hex(c, patch->syscall_offset);
-// 	c = print_cstr(c, " -- ");
+	/* prefix: "/lib/libc.so 0x1234 -- " */
+	c = print_cstr(c, patch->containing_lib_path);
+	c = print_cstr(c, " ");
+	c = print_hex(c, patch->syscall_offset);
+	c = print_cstr(c, " -- ");
 
-// 	c = print_syscall(c, desc, result_known, result);
+	// c = print_syscall(c, desc, result_known, result);
 
-// 	*c++ = '\n';
+	*c++ = '\n';
 
-// 	syscall_no_intercept(SYS_write, log_fd, buffer, c - buffer);
-// }
+	syscall_no_intercept(SYS_write, log_fd, buffer, c - buffer);
+}
 
 /*
  * intercept_log

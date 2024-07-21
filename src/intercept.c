@@ -654,7 +654,7 @@ intercept_routine(struct context *context)
 	if (handle_magic_syscalls(&desc, &result) == 0)
 		return (struct wrapper_ret){.a0 = result, .a1 = 1 };
 
-	// intercept_log_syscall(patch, &desc, UNKNOWN, 0);
+	intercept_log_syscall(patch, &desc, UNKNOWN, 0);
 
 	if (intercept_hook_point != NULL)
 		forward_to_kernel = intercept_hook_point(desc.nr,

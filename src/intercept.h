@@ -115,6 +115,7 @@ struct patch_desc {
 	bool uses_prev_ins;
 	bool uses_next_ins;
 
+	bool is_interceptable;
 	bool uses_nop_trampoline;
 
 	struct range nop_trampoline;
