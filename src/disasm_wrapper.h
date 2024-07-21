@@ -54,6 +54,7 @@ struct intercept_disasm_result {
 	bool is_set;
 
 	bool is_syscall;
+	int64_t syscall_num;
 
 	/* Length in bytes, zero if disasm was not successful. */
 	unsigned length;
@@ -122,6 +123,6 @@ void intercept_disasm_destroy(struct intercept_disasm_context *context);
 
 struct intercept_disasm_result
 intercept_disasm_next_instruction(struct intercept_disasm_context *context,
-					const unsigned char *code);
+					const unsigned char *code, int* a7_reg);
 
 #endif

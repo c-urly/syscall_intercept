@@ -454,6 +454,8 @@ is_overwritable_nop(const struct intercept_disasm_result *ins)
 static void
 crawl_text(struct intercept_desc *desc)
 {
+	int sys_count = 0;
+	int64_t last_a7 = 0;
 	unsigned char *code = desc->text_start;
 
 	/*
@@ -476,7 +478,7 @@ crawl_text(struct intercept_desc *desc)
 	while (code <= desc->text_end) {
 		struct intercept_disasm_result result;
 
-		result = intercept_disasm_next_instruction(context, code);
+		result = intercept_disasm_next_instruction(context, code, &last_a7);
 
 		if (result.length == 0) {
 			++code;
@@ -485,6 +487,12 @@ crawl_text(struct intercept_desc *desc)
 
 		if (result.has_ip_relative_opr)
 			mark_jump(desc, result.rip_ref_addr);
+
+		if(result.is_syscall){
+			result.syscall_num = last_a7;
+			sys_count++;
+			// debug_dump("mnemonic: %s: %d\n",result.mnemonic, result.syscall_num);
+		}
 
 	//	if (is_overwritable_nop(&result))
 			// mark_nop(desc, code, result.length);
@@ -545,7 +553,7 @@ crawl_text(struct intercept_desc *desc)
 
 		code += result.length;
 	}
-
+	debug_dump("syscall count: %d\n", sys_count);
 	intercept_disasm_destroy(context);
 }
 

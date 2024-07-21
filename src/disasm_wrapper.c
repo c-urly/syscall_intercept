@@ -90,7 +90,7 @@ intercept_disasm_init(const unsigned char *begin, const unsigned char *end)
 	 * Initialize the disassembler.
 	 * The handle here must be passed to capstone each time it is used.
 	 */
-	if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64, &context->handle) != CS_ERR_OK)
+	if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64|CS_MODE_RISCVC, &context->handle) != CS_ERR_OK)
 		xabort("cs_open");
 
 	/*
@@ -224,6 +224,23 @@ void calculate_jump_offset_and_address(cs_insn *insn, struct intercept_disasm_re
     result->has_ip_relative_opr = is_ip_relative(insn);
 }
 
+int64_t check_a7_reg(cs_insn *insn) {
+    cs_riscv *riscv = &(insn->detail->riscv);
+    int64_t a7 = -1;
+
+    if (insn->id == RISCV_INS_ADDI) {
+        cs_riscv *riscv = &(insn->detail->riscv);
+        if (riscv->op_count == 3 &&
+            riscv->operands[0].type == RISCV_OP_REG && riscv->operands[0].reg == RISCV_REG_A7 &&
+            riscv->operands[1].type == RISCV_OP_REG && riscv->operands[1].reg == RISCV_REG_ZERO &&
+            riscv->operands[2].type == RISCV_OP_IMM) {
+            a7 = riscv->operands[2].imm;
+            // debug_dump("mnemonic : %s a7: %d\n",insn->mnemonic,a7);
+        }
+    }
+    return a7;
+}
+
 /*
  * intercept_disasm_next_instruction - Examines a single instruction
  * in a text section. This is only a wrapper around capstone specific code,
@@ -231,7 +248,7 @@ void calculate_jump_offset_and_address(cs_insn *insn, struct intercept_disasm_re
  */
 struct intercept_disasm_result
 intercept_disasm_next_instruction(struct intercept_disasm_context *context,
-					const unsigned char *code)
+					const unsigned char *code, int* syscall_reg)
 {
 	struct intercept_disasm_result result = {0, };
 	const unsigned char *start = code;
@@ -256,9 +273,14 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 	result.mnemonic = context->insn->mnemonic;
 #endif
 
-        result.is_jump = false;
+    result.is_jump = false;
 
 	calculate_jump_offset_and_address(context->insn, &result);
+    // debug_dump("0x%" PRIx64 ":\t%s\t%s\n", context->insn->address, context->insn->mnemonic, context->insn->op_str);
+    int64_t a7  = check_a7_reg(context->insn);
+    if(a7 != -1){
+        *syscall_reg = a7;
+    }
 	result.is_set = true;
 
 	return result;
