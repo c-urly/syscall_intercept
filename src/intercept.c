@@ -102,39 +102,47 @@ debug_dump(const char *fmt, ...)
 
 static void log_header(void);
 
-void __attribute__((noreturn)) xlongjmp(long rip, long rsp, long rax);
-
 /*
- * Kernel can clobber rcx and r11 while serving a syscall, those are ignored
- * The layout of this struct depends on the way the assembly wrapper saves
- * register on the stack.
- * Note: don't expect the SIMD array to be aligned for efficient use with
- * AVX instructions.
+ *
+ * Registers/context that needs to be saved before calling hook and syscalls
  */
 struct context {
 	struct patch_desc *patch_desc;
-	long rip;
-	long r15;
-	long r14;
-	long r13;
-	long r12;
-	long r10;
-	long r9;
-	long r8;
-	long rsp;
-	long rbp;
-	long rdi;
-	long rsi;
-	long rbx;
-	long rdx;
-	long rax;
+    long s11;
+    long s10;
+    long s9;
+    long s8;
+    long s7;
+    long s6;
+    long s5;
+    long s4;
+    long s3;
+    long s2;
+    long a7;
+    long a6;
+    long a5;
+    long a4;
+    long a3;
+    long a2;
+    long a1;
+    long a0;
+    long s1;
+    long s0;
+    long t6;
+    long t5;
+    long t4;
+    long t3;
+    long t2;
+    long t1;
+    long t0;
+    long ra;
 	char padd[0x200 - 0x168]; /* see: stack layout in intercept_wrapper.s */
-	long SIMD[16][8]; /* 8 SSE, 8 AVX, or 16 AVX512 registers */
+	long SIMD[16][8];
 };
 
 struct wrapper_ret {
-	long rax;
-	long rdx;
+	long a0;
+	long a1;
 };
 
 /* Should all objects be patched, or only libc and libpthread? */
@@ -497,11 +505,11 @@ intercept(int argc, char **argv)
 		if (objs[i].count > 0 && is_asm_wrapper_space_full())
 			xabort("not enough space in asm_wrapper_space");
 		allocate_trampoline_table(objs + i);
-		create_patch_wrappers(objs + i, &next_asm_wrapper_space);
+		// create_patch_wrappers(objs + i, &next_asm_wrapper_space);
 	}
-	mprotect_asm_wrappers();
-	for (unsigned i = 0; i < objs_count; ++i)
-		activate_patches(objs + i);
+	// mprotect_asm_wrappers();
+	// for (unsigned i = 0; i < objs_count; ++i)
+	// 	activate_patches(objs + i);
 }
 
 /*
@@ -515,7 +523,7 @@ log_header(void)
 	static const char self_decoder[] =
 		"tempfile=$(mktemp) ; tempfile2=$(mktemp) ; "
 		"grep \"^/\" $0 | cut -d \" \" -f 1,2 | "
-		"sed \"s/^/addr2line -p -f -e /\" > $tempfile ; "
+		"sed \"s/^/riscv64-unknown-linux-gnu-addr2line -p -f -e /\" > $tempfile ; "
 		"{ echo ; . $tempfile ; echo ; } > $tempfile2 ; "
 		"paste $tempfile2 $0 ; exit 0\n";
 
@@ -593,13 +601,13 @@ xabort_on_syserror(long syscall_result, const char *msg)
 static void
 get_syscall_in_context(struct context *context, struct syscall_desc *sys)
 {
-	sys->nr = (int)context->rax; /* ignore higher 32 bits */
-	sys->args[0] = context->rdi;
-	sys->args[1] = context->rsi;
-	sys->args[2] = context->rdx;
-	sys->args[3] = context->r10;
-	sys->args[4] = context->r8;
-	sys->args[5] = context->r9;
+	sys->nr = (int)context->a7; /* ignore higher 32 bits */
+	sys->args[0] = context->a0;
+	sys->args[1] = context->a1;
+	sys->args[2] = context->a2;
+	sys->args[3] = context->a3;
+	sys->args[4] = context->a4;
+	sys->args[5] = context->a5;
 }
 
 /*
@@ -636,7 +644,7 @@ get_syscall_in_context(struct context *context, struct syscall_desc *sys)
 struct wrapper_ret
 intercept_routine(struct context *context)
 {
-	long result;
+	long result = 0;
 	int forward_to_kernel = true;
 	struct syscall_desc desc;
 	struct patch_desc *patch = context->patch_desc;
@@ -644,9 +652,9 @@ intercept_routine(struct context *context)
 	get_syscall_in_context(context, &desc);
 
 	if (handle_magic_syscalls(&desc, &result) == 0)
-		return (struct wrapper_ret){.rax = result, .rdx = 1 };
+		return (struct wrapper_ret){.a0 = result, .a1 = 1 };
 
-	intercept_log_syscall(patch, &desc, UNKNOWN, 0);
+	// intercept_log_syscall(patch, &desc, UNKNOWN, 0);
 
 	if (intercept_hook_point != NULL)
 		forward_to_kernel = intercept_hook_point(desc.nr,
@@ -658,9 +666,9 @@ intercept_routine(struct context *context)
 		    desc.args[5],
 		    &result);
 
-	if (desc.nr == SYS_vfork || desc.nr == SYS_rt_sigreturn) {
+	if (/* desc.nr == SYS_vfork || */ desc.nr == SYS_rt_sigreturn) {
 		/* can't handle these syscalls the normal way */
-		return (struct wrapper_ret){.rax = context->rax, .rdx = 0 };
+		return (struct wrapper_ret){.a0 = context->a0, .a1 = 0 };
 	}
 
 	if (forward_to_kernel) {
@@ -678,13 +686,13 @@ intercept_routine(struct context *context)
 		 */
 		if (desc.nr == SYS_clone && desc.args[1] != 0) {
 			return (struct wrapper_ret){
-				.rax = context->rax, .rdx = 2 };
+				.a0 = context->a0, .a1 = 2 };
 		}
 #ifdef SYS_clone3
 		else if (desc.nr == SYS_clone3 &&
 			((struct clone_args *)desc.args[0])->stack != 0) {
 			return (struct wrapper_ret){
-				.rax = context->rax, .rdx = 2 };
+				.a0 = context->a0, .a1 = 2 };
 		}
 #endif
 		else
@@ -699,7 +707,7 @@ intercept_routine(struct context *context)
 
 	intercept_log_syscall(patch, &desc, KNOWN, result);
 
-	return (struct wrapper_ret){ .rax = result, .rdx = 1 };
+	return (struct wrapper_ret){ .a0 = result, .a1 = 1 };
 }
 
 /*
@@ -710,13 +718,13 @@ intercept_routine(struct context *context)
 struct wrapper_ret
 intercept_routine_post_clone(struct context *context)
 {
-	if (context->rax == 0) {
+	if (context->a0 == 0) {
 		if (intercept_hook_point_clone_child != NULL)
 			intercept_hook_point_clone_child();
 	} else {
 		if (intercept_hook_point_clone_parent != NULL)
-			intercept_hook_point_clone_parent(context->rax);
+			intercept_hook_point_clone_parent(context->a0);
 	}
 
-	return (struct wrapper_ret){.rax = context->rax, .rdx = 1 };
+	return (struct wrapper_ret){.a0 = context->a0, .a1 = 1 };
 }

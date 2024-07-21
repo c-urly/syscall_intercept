@@ -4,3 +4,7 @@ tags
 /.settings
 /build-deb
 /syscall_intercept-*.tar.gz
+.vscode/
+
+[Bb][uU][iI][lL][dD]/
+library/

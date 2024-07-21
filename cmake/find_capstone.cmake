@@ -32,11 +32,19 @@
 find_package(capstone QUIET)
 
 if(NOT capstone_FOUND)
-	find_package(PkgConfig QUIET)
-	if(PKG_CONFIG_FOUND)
-		pkg_search_module(capstone capstone QUIET)
-	endif()
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+        message(STATUS "pkg-config found: ${PKG_CONFIG_EXECUTABLE}")
+        message(STATUS "Using pkg-config path: $ENV{PKG_CONFIG_PATH}")
+        pkg_search_module(capstone capstone QUIET)
+    else()
+        message(FATAL_ERROR "pkg-config not found. Please install pkg-config.")
+    endif()
 endif()
+# Add debug messages to check where the variables are pointing
+message(STATUS "PKG_CONFIG_PATH: $ENV{PKG_CONFIG_PATH}")
+message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
+message(STATUS "CMAKE_MODULE_PATH: ${CMAKE_MODULE_PATH}")
 
 if(NOT capstone_FOUND)
 	message(FATAL_ERROR
@@ -47,4 +55,9 @@ sudo dnf install capstone-devel (on Fedora)
 or see instructions for other ways of installing capstone: http://www.capstone-engine.org/download.html
 If casptone is installed, but cmake didn't manage to find it, there is a slight chance of fixing things by setting some of the following environment variables:
 PKG_CONFIG_PATH, CMAKE_PREFIX_PATH, CMAKE_MODULE_PATH")
+else()
+    message(STATUS "Capstone found: ${capstone_FOUND}")
+    message(STATUS "Capstone include directories: ${capstone_INCLUDE_DIRS}")
+    message(STATUS "Capstone library directories: ${capstone_LIBRARY_DIRS}")
+    message(STATUS "Capstone libraries: ${capstone_LIBRARIES}")
 endif()

@@ -62,8 +62,8 @@ open_orig_file(const struct intercept_desc *desc)
 {
 	int fd;
 
-	fd = syscall_no_intercept(SYS_open, desc->path, O_RDONLY);
-
+	fd = syscall_no_intercept(SYS_openat, AT_FDCWD, desc->path, O_RDONLY);
+	
 	xabort_on_syserror(fd, __func__);
 
 	return fd;
@@ -486,8 +486,8 @@ crawl_text(struct intercept_desc *desc)
 		if (result.has_ip_relative_opr)
 			mark_jump(desc, result.rip_ref_addr);
 
-		if (is_overwritable_nop(&result))
-			mark_nop(desc, code, result.length);
+	//	if (is_overwritable_nop(&result))
+			// mark_nop(desc, code, result.length);
 
 		/*
 		 * Generate a new patch description, if:
@@ -515,6 +515,10 @@ crawl_text(struct intercept_desc *desc)
 		 * the second instruction in the text section is a syscall.
 		 * These implausible edge cases don't seem to be very important
 		 * right now.
+		 * 
+		 * In RISCV some of the syscalls are at the second position in its
+		 * respective symbol. for eg: (chdir)
+		 * 
 		 */
 		if (has_prevs >= 1 && prevs[2].is_syscall) {
 			struct patch_desc *patch = add_new_patch(desc);
@@ -561,7 +565,7 @@ get_min_address(void)
 
 	min_address = 0x10000; /* best guess */
 
-	int fd = syscall_no_intercept(SYS_open, "/proc/sys/vm/mmap_min_addr",
+	int fd = syscall_no_intercept(SYS_fsopen, "/proc/sys/vm/mmap_min_addr",
 					O_RDONLY);
 
 	if (fd >= 0) {
@@ -702,7 +706,7 @@ find_syscalls(struct intercept_desc *desc)
 	    (uintptr_t)desc->text_start,
 	    (uintptr_t)desc->text_end);
 	allocate_jump_table(desc);
-	allocate_nop_table(desc);
+	// allocate_nop_table(desc);
 
 	for (Elf64_Half i = 0; i < desc->symbol_tables.count; ++i)
 		find_jumps_in_section_syms(desc,

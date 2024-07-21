@@ -756,6 +756,22 @@ Hello from client
 Hello message sent
 Hello message sent
 Hello from server
+
+```
+
+## Building and running libsyscall with riscv64 binary (WIP)
+```sh
+$ export RISCV_TOOLCHAIN_PATH=/path/to/riscv-toolchain
+
+$ sudo cmake path/to/syscall_intercept  -DCMAKE_INSTALL_PREFIX=path/to/install     -DCMAKE_TOOLCHAIN_FILE=path/to/cmake/riscv.cmake  -DCMAKE_BUILD_TYPE=Release
+
+$ sudo make install
+
+$ qemu-riscv64 \
+             -E LD_PRELOAD=/home/curly/Github/syscall_intercept/library/build_riscv/install/lib/libsyscall_intercept.so \
+             -E INTERCEPT_DEBUG_DUMP=1,LD_LIBRARY_PATH=/home/curly/installs/riscv64/sysroot/lib:/home/curly/installs/riscv64/sysroot/usr/lib:$LD_LIBRARY_PATH \
+             -L /home/curly/installs/riscv64/sysroot \
+             ./app_riscv64
 ```
 
 ## Debug Environment ##
@@ -801,6 +817,10 @@ $ qemu-riscv64 -g 1234 ./app_riscv64
 
 
 ```sh
+$ cat ~/.gdbinit 
+set solib-search-path path/to/riscv64/sysroot/lib
+set sysroot path/to/riscv64/sysroot
+
 $ riscv64-unknown-elf-gdb ./app_riscv64
 
 Reading symbols from ./app_riscv64...

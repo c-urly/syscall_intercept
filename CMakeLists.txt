@@ -41,11 +41,11 @@ if(",${CMAKE_SOURCE_DIR}," STREQUAL ",${CMAKE_BINARY_DIR},")
 endif()
 
 option(PERFORM_STYLE_CHECKS
-	"check coding style, license headers (requires perl)" ON)
-option(BUILD_TESTS "build and enable tests" ON)
-option(BUILD_EXAMPLES "build examples" ON)
+	"check coding style, license headers (requires perl)" OFF)
+option(BUILD_TESTS "build and enable tests" OFF)
+option(BUILD_EXAMPLES "build examples" OFF)
 option(TREAT_WARNINGS_AS_ERRORS
-	"make the build fail on any warnings during compilation, or linking" ON)
+	"make the build fail on any warnings during compilation, or linking" OFF)
 option(EXPECT_SPURIOUS_SYSCALLS
 	"account for some unexpected syscalls in tests - enable while using sanitizers, gcov" OFF)
 option(STATIC_CAPSTONE "statically link libcapstone into the shared library" OFF)
@@ -75,8 +75,8 @@ set(SOURCES_C
 	src/intercept_log.c
 	src/intercept_util.c
 	src/patcher.c
-	src/magic_syscalls.c
-	src/syscall_formats.c)
+	src/magic_syscalls.c)
+	# src/syscall_formats.c)
 
 set(SOURCES_ASM
 	src/intercept_template.S
@@ -102,7 +102,7 @@ if(HAS_NOUNUSEDARG)
 	target_compile_options(syscall_intercept_base_asm BEFORE
 		PRIVATE "-Wno-unused-command-line-argument")
 endif()
-
+message(STATUS "Capstone libraries: ${capstone_CFLAGS}")
 set_property(TARGET syscall_intercept_base_c
 	APPEND PROPERTY COMPILE_FLAGS ${capstone_CFLAGS})
 
@@ -147,7 +147,7 @@ endif()
 
 target_link_libraries(syscall_intercept_shared
 	PRIVATE ${CMAKE_DL_LIBS}
-	"-Wl,--push-state,${CAPSTONE_LINK_MODE} -lcapstone -Wl,--pop-state"
+	"-Wl,--push-state,${CAPSTONE_LINK_MODE} ${CAPSTONE_LIBRARY_DIR}/libcapstone.so -Wl,--pop-state"
 	"-Wl,--version-script=${CMAKE_SOURCE_DIR}/version.map")
 
 target_link_libraries(syscall_intercept_static

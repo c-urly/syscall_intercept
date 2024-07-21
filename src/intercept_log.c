@@ -38,7 +38,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <limits.h>
+#include <linux/limits.h>
 #include <sched.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -830,7 +830,7 @@ intercept_setup_log(const char *path, const char *trunc)
 
 	intercept_log_close(); /* in case a log was already open */
 
-	log_fd = (int)syscall_no_intercept(SYS_open, full_path, flags, 0700);
+	log_fd = (int)syscall_no_intercept(SYS_fsopen, full_path, flags, 0700);
 
 	xabort_on_syserror(log_fd, "opening log");
 }
@@ -847,42 +847,42 @@ print_return_value(char *c, enum return_type type, long value)
 	return return_value_printer_table[type](c, value);
 }
 
-static char *
-print_syscall(char *c, const struct syscall_desc *desc,
-			enum intercept_log_result result_known, long result)
-{
-	const struct syscall_format *format = get_syscall_format(desc);
+// static char *
+// print_syscall(char *c, const struct syscall_desc *desc,
+// 			enum intercept_log_result result_known, long result)
+// {
+// 	const struct syscall_format *format = get_syscall_format(desc);
 
-	if (format->name != NULL) {
-		/* known syscall, e.g.: "open(" */
-		c = print_cstr(c, format->name);
-		c = print_cstr(c, "(");
-	} else {
-		/* unknown syscall, e.g.: "syscall(456, " */
-		c = print_cstr(c, "syscall(");
-		c = print_signed_dec(c, desc->nr);
-		c = print_cstr(c, ", ");
-	}
+// 	if (format->name != NULL) {
+// 		/* known syscall, e.g.: "open(" */
+// 		c = print_cstr(c, format->name);
+// 		c = print_cstr(c, "(");
+// 	} else {
+// 		/* unknown syscall, e.g.: "syscall(456, " */
+// 		c = print_cstr(c, "syscall(");
+// 		c = print_signed_dec(c, desc->nr);
+// 		c = print_cstr(c, ", ");
+// 	}
 
-	for (int i = 0; format->args[i] != arg_none; ++i) {
-		if (i != 0)
-			c = print_cstr(c, ", ");
+// 	for (int i = 0; format->args[i] != arg_none; ++i) {
+// 		if (i != 0)
+// 			c = print_cstr(c, ", ");
 
-		arg_printer_func func = arg_printer_func_table[format->args[i]];
-		c = func(c, desc, i, result_known, result);
-	}
-	c = print_cstr(c, ")");
+// 		arg_printer_func func = arg_printer_func_table[format->args[i]];
+// 		c = func(c, desc, i, result_known, result);
+// 	}
+// 	c = print_cstr(c, ")");
 
-	if (format->return_type != rnoreturn) {
-		c = print_cstr(c, " = ");
-		if (result_known == KNOWN)
-			c = print_return_value(c, format->return_type, result);
-		else
-			*c++ = '?';
-	}
+// 	if (format->return_type != rnoreturn) {
+// 		c = print_cstr(c, " = ");
+// 		if (result_known == KNOWN)
+// 			c = print_return_value(c, format->return_type, result);
+// 		else
+// 			*c++ = '?';
+// 	}
 
-	return c;
-}
+// 	return c;
+// }
 
 /*
  * Log syscalls after intercepting, in a human readable ( as much as possible )
@@ -906,29 +906,29 @@ print_syscall(char *c, const struct syscall_desc *desc,
  * Each syscall should be logged after being executed, so the result can be
  * logged as well.
  */
-void
-intercept_log_syscall(const struct patch_desc *patch,
-			const struct syscall_desc *desc,
-			enum intercept_log_result result_known, long result)
-{
-	if (log_fd < 0)
-		return;
+// void
+// intercept_log_syscall(const struct patch_desc *patch,
+// 			const struct syscall_desc *desc,
+// 			enum intercept_log_result result_known, long result)
+// {
+// 	if (log_fd < 0)
+// 		return;
 
-	char buffer[0x1000];
-	char *c = buffer;
+// 	char buffer[0x1000];
+// 	char *c = buffer;
 
-	/* prefix: "/lib/libc.so 0x1234 -- " */
-	c = print_cstr(c, patch->containing_lib_path);
-	c = print_cstr(c, " ");
-	c = print_hex(c, patch->syscall_offset);
-	c = print_cstr(c, " -- ");
+// 	/* prefix: "/lib/libc.so 0x1234 -- " */
+// 	c = print_cstr(c, patch->containing_lib_path);
+// 	c = print_cstr(c, " ");
+// 	c = print_hex(c, patch->syscall_offset);
+// 	c = print_cstr(c, " -- ");
 
-	c = print_syscall(c, desc, result_known, result);
+// 	c = print_syscall(c, desc, result_known, result);
 
-	*c++ = '\n';
+// 	*c++ = '\n';
 
-	syscall_no_intercept(SYS_write, log_fd, buffer, c - buffer);
-}
+// 	syscall_no_intercept(SYS_write, log_fd, buffer, c - buffer);
+// }
 
 /*
  * intercept_log

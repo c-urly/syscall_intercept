@@ -45,6 +45,12 @@
 
 #include "disasm_wrapper.h"
 
+#ifdef __riscv_v
+	#define HAS_RISCV_VECTOR 1
+#else
+	#define HAS_RISCV_VECTOR 0
+#endif
+
 extern bool debug_dumps_on;
 void debug_dump(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
@@ -202,8 +208,8 @@ void mprotect_asm_wrappers(void);
  */
 void activate_patches(struct intercept_desc *desc);
 
-#define SYSCALL_INS_SIZE 2
-#define JUMP_INS_SIZE 5
+#define SYSCALL_INS_SIZE 4
+#define JUMP_INS_SIZE 4
 #define CALL_OPCODE 0xe8
 #define JMP_OPCODE 0xe9
 #define SHORT_JMP_OPCODE 0xeb
