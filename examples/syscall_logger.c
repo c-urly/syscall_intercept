@@ -832,6 +832,7 @@ hook(long syscall_number,
 			syscall_no_intercept(SYS_write, log_fd,
 						buffer, buffer_offset);
 	}
+	
 
 	*result = syscall_no_intercept(syscall_number,
 					arg0, arg1, arg2, arg3, arg4, arg5);
@@ -849,11 +850,12 @@ start(void)
 	if (path == NULL)
 		syscall_no_intercept(SYS_exit_group, 3);
 
-	log_fd = (int)syscall_no_intercept(SYS_open,
-			path, O_CREAT | O_RDWR, (mode_t)0700);
+	log_fd = (int)syscall_no_intercept(SYS_openat, AT_FDCWD,
+			path, O_CREAT | O_RDWR, (mode_t)0777);
 
-	if (log_fd < 0)
+	if (log_fd < 0){
 		syscall_no_intercept(SYS_exit_group, 4);
+	}
 
 	intercept_hook_point = &hook;
 }

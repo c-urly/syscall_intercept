@@ -43,7 +43,7 @@ endif()
 option(PERFORM_STYLE_CHECKS
 	"check coding style, license headers (requires perl)" OFF)
 option(BUILD_TESTS "build and enable tests" OFF)
-option(BUILD_EXAMPLES "build examples" OFF)
+option(BUILD_EXAMPLES "build examples" ON)
 option(TREAT_WARNINGS_AS_ERRORS
 	"make the build fail on any warnings during compilation, or linking" OFF)
 option(EXPECT_SPURIOUS_SYSCALLS
@@ -75,8 +75,8 @@ set(SOURCES_C
 	src/intercept_log.c
 	src/intercept_util.c
 	src/patcher.c
-	src/magic_syscalls.c)
-	# src/syscall_formats.c)
+	src/magic_syscalls.c
+	src/syscall_formats.c)
 
 set(SOURCES_ASM
 	src/intercept_template.S

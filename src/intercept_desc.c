@@ -45,6 +45,8 @@
 #include "intercept_util.h"
 #include "disasm_wrapper.h"
 
+extern bool should_intercept_syscall(int sys_num);
+
 /*
  * open_orig_file
  *
@@ -246,9 +248,14 @@ set_bit(unsigned char *table, uint64_t offset)
 bool
 has_jump(const struct intercept_desc *desc, unsigned char *addr)
 {
-	if (addr >= desc->text_start && addr <= desc->text_end)
-		return is_bit_set(desc->jump_table,
+	if (addr >= desc->text_start && addr <= desc->text_end){
+		bool is_jump = is_bit_set(desc->jump_table,
 		    (uint64_t)(addr - desc->text_start));
+
+		// debug_dump("Address: 0x%016" PRIx64 "\n", (uint64_t)addr);
+		// debug_dump("is Jump: %d\n",is_jump);
+		return is_jump;
+	}
 	else
 		return false;
 }
@@ -259,6 +266,7 @@ has_jump(const struct intercept_desc *desc, unsigned char *addr)
 void
 mark_jump(const struct intercept_desc *desc, const unsigned char *addr)
 {
+	// debug_dump("Mark Jump Address: %p\n", addr);
 	if (addr >= desc->text_start && addr <= desc->text_end)
 		set_bit(desc->jump_table, (uint64_t)(addr - desc->text_start));
 }
@@ -308,8 +316,8 @@ find_jumps_in_section_syms(struct intercept_desc *desc, Elf64_Shdr *section,
 		if (syms[i].st_shndx != desc->text_section_index)
 			continue; /* it is not in the text section */
 
-		debug_dump("jump target: %lx\n",
-		    (unsigned long)syms[i].st_value);
+		// debug_dump("jump target: %lx\n",
+		//     (unsigned long)syms[i].st_value);
 
 		unsigned char *address = desc->base_addr + syms[i].st_value;
 
@@ -431,7 +439,7 @@ add_new_patch(struct intercept_desc *desc)
 bool
 is_overwritable_nop(const struct intercept_disasm_result *ins)
 {
-	return ins->is_nop && ins->length >= 2 + 5;
+    return (ins->is_nop || ins->is_unimp);
 }
 
 /*
@@ -459,15 +467,15 @@ crawl_text(struct intercept_desc *desc)
 	unsigned char *code = desc->text_start;
 
 	/*
-	 * Remember the previous three instructions, while
+	 * Remember the previous four instructions, while
 	 * disassembling the code instruction by instruction in the
 	 * while loop below.
 	 */
-	struct intercept_disasm_result prevs[3] = {{0, }};
+	struct intercept_disasm_result prevs[4] = {{0, }};
 
 	/*
 	 * How many previous instructions were decoded before this one,
-	 * and stored in the prevs array. Usually three, except for the
+	 * and stored in the prevs array. Usually four, except for the
 	 * beginning of the text section -- the first instruction naturally
 	 * has no previous instruction.
 	 */
@@ -475,8 +483,9 @@ crawl_text(struct intercept_desc *desc)
 	struct intercept_disasm_context *context =
 	    intercept_disasm_init(desc->text_start, desc->text_end);
 
+	struct intercept_disasm_result result;
 	while (code <= desc->text_end) {
-		struct intercept_disasm_result result;
+		
 
 		result = intercept_disasm_next_instruction(context, code, &last_a7);
 
@@ -485,29 +494,31 @@ crawl_text(struct intercept_desc *desc)
 			continue;
 		}
 
-		if (result.has_ip_relative_opr)
+		if (result.has_ip_relative_opr){
+			// debug_dump("Rip ref addr: %p\n",result.rip_ref_addr);
 			mark_jump(desc, result.rip_ref_addr);
+		}
+
+		if(result.is_nop || result.is_unimp){
+			mark_nop(desc, code, result.length);
+		}
 
 		if(result.is_syscall){
 			result.syscall_num = last_a7;
 			sys_count++;
-			// debug_dump("mnemonic: %s: %d\n",result.mnemonic, result.syscall_num);
-		}
-
-	//	if (is_overwritable_nop(&result))
-			// mark_nop(desc, code, result.length);
-
+			// debug_dump("mnemonic: %s: %p\n",result.mnemonic, result.address);
+		}		
 		/*
 		 * Generate a new patch description, if:
-		 * - Information is available about a syscalls place
+		 * - Information is available about a syscall's place
 		 * - one following instruction
 		 * - two preceding instructions
 		 *
-		 * So this is done only if instruction in the previous
-		 * loop iteration was a syscall. Which means the currently
+		 * So this is done only if the instruction in the previous
+		 * loop iteration was a syscall. This means the currently
 		 * decoded instruction is the 'following' instruction -- as
 		 * in following the syscall.
-		 * The two instructions from two iterations ago, and three
+		 * The two instructions from two iterations ago and three
 		 * iterations ago are going to be the two 'preceding'
 		 * instructions stored in the patch description. Other fields
 		 * of the struct patch_desc are not filled at this point yet.
@@ -515,27 +526,26 @@ crawl_text(struct intercept_desc *desc)
 		 * prevs[0]      ->     patch->preceding_ins_2
 		 * prevs[1]      ->     patch->preceding_ins
 		 * prevs[2]      ->     [syscall]
-		 * current ins.  ->     patch->following_ins
-		 *
+		 * prevs[3]      ->     patch->following_ins
+		 * current ins.  ->     patch->following_ins_2
 		 *
 		 * XXX -- this ignores the cases where the text section
-		 * starts, or ends with a syscall instruction, or indeed, if
+		 * starts or ends with a syscall instruction, or indeed, if
 		 * the second instruction in the text section is a syscall.
 		 * These implausible edge cases don't seem to be very important
 		 * right now.
 		 * 
-		 * In RISCV some of the syscalls are at the second position in its
-		 * respective symbol. for eg: (chdir)
-		 * 
 		 */
-		if (has_prevs >= 1 && prevs[2].is_syscall) {
+		if (has_prevs >= 2 && prevs[2].is_syscall && should_intercept_syscall(prevs[2].syscall_num)) {
 			struct patch_desc *patch = add_new_patch(desc);
 
 			patch->containing_lib_path = desc->path;
 			patch->preceding_ins_2 = prevs[0];
 			patch->preceding_ins = prevs[1];
-			patch->following_ins = result;
-			patch->syscall_addr = code - SYSCALL_INS_SIZE;
+			patch->following_ins = prevs[3];
+			patch->following_ins_2 = result;
+			patch->syscall_addr = code - SYSCALL_INS_SIZE - prevs[3].length;
+			patch->syscall_num = prevs[2].syscall_num;
 
 			ptrdiff_t syscall_offset = patch->syscall_addr -
 			    (desc->text_start - desc->text_offset);
@@ -545,14 +555,24 @@ crawl_text(struct intercept_desc *desc)
 			patch->syscall_offset = (unsigned long)syscall_offset;
 		}
 
+		if(has_prevs > 3){
+			for (int i = 0; i < 4; ++i) {
+				free((char *)prevs[i].mnemonic);
+			}
+		}
+
+		// Move the prevs window
 		prevs[0] = prevs[1];
 		prevs[1] = prevs[2];
-		prevs[2] = result;
-		if (has_prevs < 2)
+		prevs[2] = prevs[3];
+		prevs[3] = result;
+
+		if (has_prevs < 3)
 			++has_prevs;
 
 		code += result.length;
 	}
+
 	debug_dump("syscall count: %d\n", sys_count);
 	intercept_disasm_destroy(context);
 }
@@ -714,7 +734,7 @@ find_syscalls(struct intercept_desc *desc)
 	    (uintptr_t)desc->text_start,
 	    (uintptr_t)desc->text_end);
 	allocate_jump_table(desc);
-	// allocate_nop_table(desc);
+	allocate_nop_table(desc);
 
 	for (Elf64_Half i = 0; i < desc->symbol_tables.count; ++i)
 		find_jumps_in_section_syms(desc,

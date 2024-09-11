@@ -34,6 +34,7 @@
  * intercept_wrapper.S -- see asm_wrapper.md
  */
 
+
 /* the function in this file */
 .globl intercept_wrapper
 .hidden intercept_wrapper
@@ -52,6 +53,111 @@
 /* The boolean indicating whether YMM registers must be saved */
 .globl intercept_wrapper_must_save_simd
 .hidden intercept_wrapper_must_save_simd
+
+.macro save_gprs
+    sd          ra, 0x160(sp)
+    sd          a6, 0x158(sp)
+    sd          a5, 0x150(sp)
+    sd          a4, 0x148(sp)
+    sd          a3, 0x140(sp)
+    sd          a2, 0x138(sp)
+    sd          a1, 0x130(sp)
+    sd          a0, 0x128(sp)
+    sd          s1, 0x120(sp)
+    sd          s0, 0x118(sp)
+    sd          s11, 0x110(sp)
+    sd          s10, 0x108(sp)
+    sd          s9, 0x100(sp)
+    sd          s8, 0xF8(sp)
+    sd          s7, 0xF0(sp)
+    sd          s6, 0xE8(sp)
+    sd          s5, 0xE0(sp)
+    sd          s4, 0xD8(sp)
+    sd          s3, 0xD0(sp)
+    sd          s2, 0xC8(sp)
+    sd          t6, 0xC0(sp)
+    sd          t5, 0xB8(sp)
+    sd          t4, 0xB0(sp)
+    sd          t3, 0xA8(sp)
+    sd          t2, 0xA0(sp)
+/*    sd          t0, 0x98(sp) */
+.endm
+
+.macro restore_gprs
+    ld          ra, 0x160(sp)
+    ld          a6, 0x158(sp)
+    ld          a5, 0x150(sp)
+    ld          a4, 0x148(sp)
+    ld          a3, 0x140(sp)
+    ld          a2, 0x138(sp)
+    ld          a1, 0x130(sp)
+    /*ld          a0, 0x128(sp)*/
+    ld          s1, 0x120(sp)
+    ld          s0, 0x118(sp)
+    ld          s11, 0x110(sp)
+    ld          s10, 0x108(sp)
+    ld          s9, 0x100(sp)
+    ld          s8, 0xF8(sp)
+    ld          s7, 0xF0(sp)
+    ld          s6, 0xE8(sp)
+    ld          s5, 0xE0(sp)
+    ld          s4, 0xD8(sp)
+    ld          s3, 0xD0(sp)
+    ld          s2, 0xC8(sp)
+    ld          t6, 0xC0(sp)
+    ld          t5, 0xB8(sp)
+    ld          t4, 0xB0(sp)
+    ld          t3, 0xA8(sp)
+    ld          t2, 0xA0(sp)
+ /*   ld          t0, 0x98(sp) */
+.endm
+
+.macro save_floating_point
+    fsw         ft0, 0x3c0(sp)
+    fsw         ft1, 0x380(sp)
+    fsw         ft2, 0x340(sp)
+    fsw         ft3, 0x300(sp)
+    fsw         ft4, 0x2c0(sp)
+    fsw         ft5, 0x280(sp)
+    fsw         ft6, 0x240(sp)
+    fsw         ft7, 0x200(sp)
+.endm
+
+.macro restore_floating_point
+    flw         ft0, 0x3c0(sp)
+    flw         ft1, 0x380(sp)
+    flw         ft2, 0x340(sp)
+    flw         ft3, 0x300(sp)
+    flw         ft4, 0x2c0(sp)
+    flw         ft5, 0x280(sp)
+    flw         ft6, 0x240(sp)
+    flw         ft7, 0x200(sp)
+.endm
+
+.macro save_simd
+    vsetvli     a0, zero, e32, m8
+    vse.v       v0, 0x3c0(sp)
+    vse.v       v1, 0x380(sp)
+    vse.v       v2, 0x340(sp)
+    vse.v       v3, 0x300(sp)
+    vse.v       v4, 0x2c0(sp)
+    vse.v       v5, 0x280(sp)
+    vse.v       v6, 0x240(sp)
+    vse.v       v7, 0x200(sp)
+.endm
+
+.macro restore_simd
+    vsetvli     a0, zero, e32, m8
+    vle.v       v0, 0x3c0(sp)
+    vle.v       v1, 0x380(sp)
+    vle.v       v2, 0x340(sp)
+    vle.v       v3, 0x300(sp)
+    vle.v       v4, 0x2c0(sp)
+    vle.v       v5, 0x280(sp)
+    vle.v       v6, 0x240(sp)
+    vle.v       v7, 0x200(sp)
+.endm
+
 
 .text
 
@@ -72,214 +178,55 @@
  * Other arguments:
  * a0  -- which C function to call
  */
+
 intercept_wrapper:
     .cfi_startproc
 
-    /*
-     * Stack size used locally: 0x448 bytes.
-     *
-     * This size assumes the stack pointer was correctly aligned before
-     * executing the call instruction calling this function. The return
-     * address pushed to the stack uses 8 bytes. This gives the equation:
-     *
-     * new_sp = original_sp - 8 - 0x448 == original_sp - 0x450
-     * The number 0x450 is a multiple of 16, so the stack is still correctly
-     * aligned. It is very easy to forget about this when making changes to this
-     * code.
-     */
+    /* Stack adjustment */
     addi        sp, sp, -0x448
     .cfi_def_cfa_offset 0x0
 
-    /* Save all GPRs on the stack */
-    sd          ra, 0x160(sp)
-    .cfi_offset 1, 0x160
-    sd          t0, 0x158(sp)
-    .cfi_offset 6, 0x158
-    sd          t1, 0x150(sp)
-    .cfi_offset 7, 0x150
-    sd          t2, 0x148(sp)
-    .cfi_offset 8, 0x148
-    sd          t3, 0x140(sp)
-    .cfi_offset 28, 0x140
-    sd          t4, 0x138(sp)
-    .cfi_offset 29, 0x138
-    sd          t5, 0x130(sp)
-    .cfi_offset 30, 0x130
-    sd          t6, 0x128(sp)
-    .cfi_offset 31, 0x128
-    sd          s0, 0x120(sp)
-    .cfi_offset 2, 0x120
-    sd          s1, 0x118(sp)
-    .cfi_offset 3, 0x118
-    sd          a0, 0x110(sp)
-    .cfi_offset 10, 0x110
-    sd          a1, 0x108(sp)
-    .cfi_offset 11, 0x108
-    sd          a2, 0x100(sp)
-    .cfi_offset 12, 0x100
-    sd          a3, 0xf8(sp)
-    .cfi_offset 13, 0xf8
-    sd          a4, 0xf0(sp)
-    .cfi_offset 14, 0xf0
-    sd          a5, 0xe8(sp)
-    .cfi_offset 15, 0xe8
-    sd          a6, 0xe0(sp)
-    .cfi_offset 16, 0xe0
-    sd          a7, 0xd8(sp)
-    .cfi_offset 17, 0xd8
-    sd          s2, 0xd0(sp)
-    .cfi_offset 18, 0xd0
-    sd          s3, 0xc8(sp)
-    .cfi_offset 19, 0xc8
-    sd          s4, 0xc0(sp)
-    .cfi_offset 20, 0xc0
-    sd          s5, 0xb8(sp)
-    .cfi_offset 21, 0xb8
-    sd          s6, 0xb0(sp)
-    .cfi_offset 22, 0xb0
-    sd          s7, 0xa8(sp)
-    .cfi_offset 23, 0xa8
-    sd          s8, 0xa0(sp)
-    .cfi_offset 24, 0xa0
-    sd          s9, 0x98(sp)
-    .cfi_offset 25, 0x98
-    sd          s10, 0x90(sp)
-    .cfi_offset 26, 0x90
-    sd          s11, 0x88(sp)
-    .cfi_offset 27, 0x88
+    /* Save all GPRs */
+    save_gprs
 
-    ld          t3, 0x450(sp)    /* fetch original value of sp */
-    sd          t3, 0x80(sp)
+    /* Save original value of sp and patch_desc pointer */
+    /* ld          a0, 0x450(sp) */
+    /* sd          a0, 0x80(sp)  */
     .cfi_offset 5, 0x80
-    ld          t4, 0x458(sp)    /* fetch pointer to patch_desc */
-    sd          t4, 0x78(sp)
-    ld          t4, (t4)         /* fetch original value of pc */
-    sd          t4, 0x70(sp)
-    .cfi_offset 22, 0x70
+    ld          a0, 0x450(sp)
+    sd          a0, 0x98(sp)
 
-    lb          t5, intercept_wrapper_must_save_simd
-    beqz        t5, 0f
+    /* Conditional save of SIMD or Floating Point registers */
+    /* lb          a0, intercept_wrapper_must_save_simd */
+    /* beqz        a0, 0f */
+0:
+    /* save_floating_point */
 
-#ifdef HAS_RISCV_VECTOR
-
-    /*
-     * Save the SIMD registers.
-     * Use vle.v and vse.v. These do not require alignment.
-     */
-    vsetvli     t6, zero, e32, m8
-    vse.v       v0, 0x3c0(sp)
-    vse.v       v1, 0x380(sp)
-    vse.v       v2, 0x340(sp)
-    vse.v       v3, 0x300(sp)
-    vse.v       v4, 0x2c0(sp)
-    vse.v       v5, 0x280(sp)
-    vse.v       v6, 0x240(sp)
-    vse.v       v7, 0x200(sp)
+1:
+    /* Call intercept routine */
+    addi    a0, sp, 0x98
+    bnez    a7, 0f  // Branch to label 0f if a7 is not zero
+    la          a7, intercept_routine
+    jalr        ra, a7
     j           1f
+0:
+    la          a7, intercept_routine_post_clone
+    jalr        ra, a7
 
-#endif
+1:
+    mv    t1, a1
+    li    t2, 1 
+    beq   t1, t2, 1f 
+    ld    a0, 0x128(sp)
 
 0:
-    /* Save the Floating point registers. */
-    fsw         ft0, 0x3c0(sp)
-    fsw         ft1, 0x380(sp)
-    fsw         ft2, 0x340(sp)
-    fsw         ft3, 0x300(sp)
-    fsw         ft4, 0x2c0(sp)
-    fsw         ft5, 0x280(sp)
-    fsw         ft6, 0x240(sp)
-    fsw         ft7, 0x200(sp)
+    /* restore_floating_point */
 
 1:
-    /* argument passed to intercept_routine */
-    ld          a0, 0x78(sp)
+    /* Restore all GPRs */
+    restore_gprs
 
-    li          t5, 1
-    beq         a0, t5, 0f
-    /* jalr x1, intercept_routine */
-    la          t6, intercept_routine
-    jalr        x1, t6
-    j           1f	
-0:  
-    /* jalr x1, intercept_routine_post_clone */
-    la          t6, intercept_routine_post_clone
-    jalr        x1, t6
-1:
-    /*
-     * At this point, the return value of the C
-     * function (a struct wrapper_ret instance) is in a0, a1.
-     *
-     * This function doesn't use these values for anything, just
-     * forwards them to the higher level wrapper function, generated
-     * from the template.
-     */
-
-    mv          t3, a1
-    /*
-     * At this point, the return values of this asm function
-     * are in a0, t3.
-     *
-     * Restore the other registers, and return.
-     */
-
-    lb          t5, intercept_wrapper_must_save_simd
-    beqz        t5, 0f
-
-#ifdef HAS_RISCV_VECTOR
-
-    vsetvli     t6, zero, e32, m8
-    vle.v       v0, 0x3c0(sp)
-    vle.v       v1, 0x380(sp)
-    vle.v       v2, 0x340(sp)
-    vle.v       v3, 0x300(sp)
-    vle.v       v4, 0x2c0(sp)
-    vle.v       v5, 0x280(sp)
-    vle.v       v6, 0x240(sp)
-    vle.v       v7, 0x200(sp)
-    j           1f
-#endif
-
-0:
-    flw         ft0, 0x3c0(sp)
-    flw         ft1, 0x380(sp)
-    flw         ft2, 0x340(sp)
-    flw         ft3, 0x300(sp)
-    flw         ft4, 0x2c0(sp)
-    flw         ft5, 0x280(sp)
-    flw         ft6, 0x240(sp)
-    flw         ft7, 0x200(sp)
-
-1:
-    ld          ra, 0x160(sp)
-    ld          t0, 0x158(sp)
-    ld          t1, 0x150(sp)
-    ld          t2, 0x148(sp)
-    ld          t3, 0x140(sp)
-    ld          t4, 0x138(sp)
-    ld          t5, 0x130(sp)
-    ld          t6, 0x128(sp)
-    ld          s0, 0x120(sp)
-    ld          s1, 0x118(sp)
-    ld          a0, 0x110(sp)
-    ld          a1, 0x108(sp)
-    ld          a2, 0x100(sp)
-    ld          a3, 0xf8(sp)
-    ld          a4, 0xf0(sp)
-    ld          a5, 0xe8(sp)
-    ld          a6, 0xe0(sp)
-    ld          a7, 0xd8(sp)
-    ld          s2, 0xd0(sp)
-    ld          s3, 0xc8(sp)
-    ld          s4, 0xc0(sp)
-    ld          s5, 0xb8(sp)
-    ld          s6, 0xb0(sp)
-    ld          s7, 0xa8(sp)
-    ld          s8, 0xa0(sp)
-    ld          s9, 0x98(sp)
-    ld          s10, 0x90(sp)
-    ld          s11, 0x88(sp)
-
+    /* Stack readjustment and return */
     addi        sp, sp, 0x448
-
     ret
     .cfi_endproc

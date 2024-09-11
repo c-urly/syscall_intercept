@@ -42,6 +42,10 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <link.h>
+#include <syscall.h>
+#include <asm/unistd.h>
+
+#define MAX_SYSCALLS __NR_syscalls
 
 #include "disasm_wrapper.h"
 
@@ -101,6 +105,9 @@ struct patch_desc {
 	/* the address to jump back to */
 	unsigned char *return_address;
 
+	/* syscall number */
+	int64_t syscall_num;
+
 	/*
 	 * Describe up to three instructions surrounding the original
 	 * syscall instructions. Sometimes just overwritting the two
@@ -111,11 +118,13 @@ struct patch_desc {
 	struct intercept_disasm_result preceding_ins_2;
 	struct intercept_disasm_result preceding_ins;
 	struct intercept_disasm_result following_ins;
+	struct intercept_disasm_result following_ins_2;
 	bool uses_prev_ins_2;
 	bool uses_prev_ins;
 	bool uses_next_ins;
+	bool uses_next_ins_2;
 
-	bool is_interceptable;
+	bool is_patchable;
 	bool uses_nop_trampoline;
 
 	struct range nop_trampoline;

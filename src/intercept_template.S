@@ -42,6 +42,8 @@
 .hidden intercept_asm_wrapper_patch_desc_addr
 .global intercept_asm_wrapper_wrapper_level1_addr
 .hidden intercept_asm_wrapper_wrapper_level1_addr
+.global intercept_asm_wrapper_syscall_num
+.hidden intercept_asm_wrapper_syscall_num
 .global intercept_asm_wrapper_tmpl_end
 .hidden intercept_asm_wrapper_tmpl_end
 
@@ -65,42 +67,42 @@
  * needed for locals.
  */
 intercept_asm_wrapper_tmpl:
-    li          t0, 0x0       /* choose intercept_routine */
-
-0:  mv          t1, sp       /* remember original sp */
+    li          a7, 0
+0:  addi        sp, sp, -32
+    sd          t1, 0(sp)
+    sd          t0, 8(sp)
+    sd          ra, 16(sp)
+    mv          t1, sp       /* remember original sp */
     addi        sp, sp, -128  /* avoid the red zone and allocate stack space */
     andi        sp, sp, -16   /* align the stack */
     addi        sp, sp, -32   /* allocate stack for some locals */
     sd          t1, 0(sp)     /* original sp on stack */
 intercept_asm_wrapper_patch_desc_addr:
     la          t1, 0x000000000000 /* we can change this to mov */
+    la          t1, 0x000000000000
     sd          t1, 8(sp)     /* patch_desc pointer on stack */
 intercept_asm_wrapper_wrapper_level1_addr:
     la          t1, 0x000000000000 /* we can change this to mov */
-    jalr        ra, t1, 0     /* call intercept_wrapper */
+    la          t1, 0x000000000000
+    /* jalr        ra, t1, 0 */     /* call intercept_wrapper */
     ld          sp, 0(sp)     /* restore original sp */
-    /*
-     * The intercept_wrapper function did restore all registers to their
-     * original state, except for a0, sp, pc, and t1.
-     *
-     * If t1 is zero, a0 contains a syscall number, and that syscall
-     *  is executed here.
-     * If t1 is 1, a0 contains the return value of the hooked syscall.
-     * If t1 is 2, a clone syscall is executed here.
-     */
-    li          t2, 0
-    beq         t1, t2, 2f
-    li          t2, 1
-    beq         t1, t2, 3f
-    li          t2, 2
-    beq         t1, t2, 1f
+intercept_asm_wrapper_syscall_num:
+    la          a7, 0x000000000000  /* we can change this to mov a7 to a syscall num which is known */
+    mv t0, x0    
+    beq t1, t0, 2f
+
+    li t0, 1    
+    beq t1, t0, 3f
+
+    li t0, 2   
+    beq t1, t0, 1f
 
     ebreak       /* t1 value is invalid? */
 
 1:
     /* execute the clone syscall in its original context */
     ecall
-    li          t0, 1        /* choose intercept_routine_post_clone */
+    li          a7, 1        /* choose intercept_routine_post_clone */
     /*
      * Now goto 0, and call the C function named
      * intercept_routine_post_clone both in the parent thread, and the
@@ -111,6 +113,10 @@ intercept_asm_wrapper_wrapper_level1_addr:
 2:
     ecall
 3:
+    ld          ra, 16(sp)
+    ld          t0, 8(sp)
+    ld          t1, 0(sp)
+    addi        sp, sp, 32
 intercept_asm_wrapper_tmpl_end:
     /*
      * This template must be appended here with a

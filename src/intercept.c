@@ -48,7 +48,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syscall.h>
 #include <sys/mman.h>
 #include <stdarg.h>
 #include <sys/auxv.h>
@@ -72,8 +71,82 @@ void (*intercept_hook_point_clone_child)(void)
 	__attribute__((visibility("default")));
 void (*intercept_hook_point_clone_parent)(long)
 	__attribute__((visibility("default")));
+bool get_syscalls_from_config(char * syscall_config);
 
 bool debug_dumps_on;
+bool syscall_config_on;
+bool interceptable_syscalls[MAX_SYSCALLS + 1] = {false};
+char* syscall_names[MAX_SYSCALLS+1];
+
+
+// Function to free the dynamically allocated syscall names
+void free_syscall_names() {
+    for (int i = 0; i <= MAX_SYSCALLS; i++) {
+        if (syscall_names[i] != NULL) {
+            free(syscall_names[i]);
+        }
+    }
+}
+
+char* get_syscall_name(int sys_num){
+	if(syscall_config_on) {
+		if (sys_num >= 0 && sys_num <= MAX_SYSCALLS)
+			return syscall_names[sys_num];
+	}
+	return NULL;
+}
+bool should_intercept_syscall(int sys_num){
+	if(syscall_config_on) {
+		if (sys_num >= 0 && sys_num <= MAX_SYSCALLS)
+			return interceptable_syscalls[sys_num];
+	}
+	return true;
+}
+bool get_syscalls_from_config(char *syscall_config) {
+    if (syscall_config == NULL) return false;
+
+    FILE *conf_file = fopen(syscall_config, "r");
+    if (conf_file == NULL) {
+        xabort("Error opening config file");
+    }
+
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    while ((read = getline(&line, &len, conf_file)) != -1) {
+        char *syscall_name_str = NULL;
+        char *syscall_num_str = NULL;
+        int syscall_num;
+
+        // Use strtok to split the line by colon
+        syscall_name_str = strtok(line, ":");
+        syscall_num_str = strtok(NULL, ":");
+
+        if (syscall_name_str != NULL && syscall_num_str != NULL) {
+            syscall_num = atoi(syscall_num_str);  // Convert syscall number to an integer
+
+            // Check if the syscall number is valid
+            if (syscall_num >= 0 && syscall_num <= MAX_SYSCALLS) {
+                interceptable_syscalls[syscall_num] = true;  // Mark as interceptable
+                
+                // Allocate memory for syscall name and store it
+                syscall_names[syscall_num] = strdup(syscall_name_str);
+                
+                // debug_dump("Syscall '%s' with number %d marked as interceptable.\n", syscall_name_str, syscall_num);
+            } else {
+                debug_dump("Invalid syscall number %d for '%s'.\n", syscall_num, syscall_name_str);
+            }
+        } else {
+            debug_dump("Invalid line format: %s", line);
+        }
+    }
+
+    free(line);  // Free the dynamically allocated buffer for line
+    fclose(conf_file);
+
+    return true;
+}
 
 void
 debug_dump(const char *fmt, ...)
@@ -108,34 +181,32 @@ static void log_header(void);
  */
 struct context {
 	struct patch_desc *patch_desc;
-    long s11;
-    long s10;
-    long s9;
-    long s8;
-    long s7;
-    long s6;
-    long s5;
-    long s4;
-    long s3;
-    long s2;
-    long a7;
-    long a6;
-    long a5;
-    long a4;
-    long a3;
-    long a2;
-    long a1;
-    long a0;
-    long s1;
-    long s0;
-    long t6;
-    long t5;
-    long t4;
-    long t3;
-    long t2;
-    long t1;
-    long t0;
-    long ra;
+	// long t0;
+	long t2;
+	long t3;
+	long t4;
+	long t5;
+	long t6;
+	long s2;
+	long s3;
+	long s4;
+	long s5;
+	long s6;
+	long s7;
+	long s8;
+	long s9;
+	long s10;
+	long s11;
+	long s0;
+	long s1;
+	long a0;
+	long a1;
+	long a2;
+	long a3;
+	long a4;
+	long a5;
+	long a6;
+	long ra;
 	char padd[0x200 - 0x168]; /* see: stack layout in intercept_wrapper.s */
 	long SIMD[16][8];
 };
@@ -490,8 +561,11 @@ intercept(int argc, char **argv)
 		return;
 
 	vdso_addr = (void *)(uintptr_t)getauxval(AT_SYSINFO_EHDR);
+	
 	debug_dumps_on = getenv("INTERCEPT_DEBUG_DUMP") != NULL;
 	patch_all_objs = (getenv("INTERCEPT_ALL_OBJS") != NULL);
+
+	syscall_config_on = get_syscalls_from_config(getenv("SYSCALL_CONFIG")); 
 	intercept_setup_log(getenv("INTERCEPT_LOG"),
 			getenv("INTERCEPT_LOG_TRUNC"));
 	log_header();
@@ -504,12 +578,14 @@ intercept(int argc, char **argv)
 	for (unsigned i = 0; i < objs_count; ++i) {
 		if (objs[i].count > 0 && is_asm_wrapper_space_full())
 			xabort("not enough space in asm_wrapper_space");
-		allocate_trampoline_table(objs + i);
-		// create_patch_wrappers(objs + i, &next_asm_wrapper_space);
+		debug_dump("Obj %d\n",i);
+		// allocate_trampoline_table(objs + i);
+		create_patch_wrappers(objs + i, &next_asm_wrapper_space);
 	}
-	// mprotect_asm_wrappers();
-	// for (unsigned i = 0; i < objs_count; ++i)
-	// 	activate_patches(objs + i);
+	mprotect_asm_wrappers();
+	for (unsigned i = 0; i < objs_count; ++i)
+		activate_patches(objs + i);
+	free_syscall_names();
 }
 
 /*
@@ -601,7 +677,7 @@ xabort_on_syserror(long syscall_result, const char *msg)
 static void
 get_syscall_in_context(struct context *context, struct syscall_desc *sys)
 {
-	sys->nr = (int)context->a7; /* ignore higher 32 bits */
+	sys->nr = (int)context->patch_desc->syscall_num; /* ignore higher 32 bits */
 	sys->args[0] = context->a0;
 	sys->args[1] = context->a1;
 	sys->args[2] = context->a2;
@@ -666,7 +742,7 @@ intercept_routine(struct context *context)
 		    desc.args[5],
 		    &result);
 
-	if (/* desc.nr == SYS_vfork || */ desc.nr == SYS_rt_sigreturn) {
+	if ( desc.nr == SYS_clone || desc.nr == SYS_rt_sigreturn) {
 		/* can't handle these syscalls the normal way */
 		return (struct wrapper_ret){.a0 = context->a0, .a1 = 0 };
 	}

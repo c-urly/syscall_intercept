@@ -97,6 +97,7 @@ struct intercept_disasm_result {
 	bool is_ret;
 
 	bool is_nop;
+	bool is_unimp;
 
 	/*
 	 * Optional fields:
@@ -109,9 +110,9 @@ struct intercept_disasm_result {
 	int32_t rip_disp;
 	const unsigned char *rip_ref_addr;
 
-#ifndef NDEBUG
+// #ifndef NDEBUG
 	const char *mnemonic;
-#endif
+// #endif
 };
 
 struct intercept_disasm_context;
@@ -123,6 +124,6 @@ void intercept_disasm_destroy(struct intercept_disasm_context *context);
 
 struct intercept_disasm_result
 intercept_disasm_next_instruction(struct intercept_disasm_context *context,
-					const unsigned char *code, int* a7_reg);
+					const unsigned char *code, int64_t* a7_reg);
 
 #endif

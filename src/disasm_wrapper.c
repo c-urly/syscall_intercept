@@ -147,12 +147,12 @@ bool is_ip_relative(cs_insn *insn) {
     return false;
 }
 
-void calculate_jump_offset_and_address(cs_insn *insn, struct intercept_disasm_result *result) {
+void calculate_jump_offset_and_address(cs_insn *insn, uint64_t address, struct intercept_disasm_result *result) {
     int32_t offset = 0;
     uint64_t absolute_address = 0;
 
     uint32_t opcode = insn->id;
-    uint32_t pc = insn->address;
+    uint64_t pc = address;
     cs_detail *detail = insn->detail;
 
     switch (opcode) {
@@ -161,11 +161,10 @@ void calculate_jump_offset_and_address(cs_insn *insn, struct intercept_disasm_re
             absolute_address = pc + offset;
             result->is_jump = true;
             result->is_rel_jump = true;
+            result->has_ip_relative_opr = true;
             break;
 
         case RISCV_INS_JALR: // JALR
-            offset = detail->riscv.operands[0].imm;
-            absolute_address = detail->riscv.operands[1].reg + offset;
             result->is_jump = true;
             result->is_indirect_jump = true;
             break;
@@ -175,7 +174,7 @@ void calculate_jump_offset_and_address(cs_insn *insn, struct intercept_disasm_re
             absolute_address = pc + offset;
             result->is_jump = false;
             result->is_rel_jump = false;
-	    result->has_ip_relative_opr = true;
+            result->has_ip_relative_opr = true;
             break;
 
         case RISCV_INS_BEQ: // BEQ
@@ -188,6 +187,7 @@ void calculate_jump_offset_and_address(cs_insn *insn, struct intercept_disasm_re
             absolute_address = pc + offset;
             result->is_jump = true;
             result->is_rel_jump = true;
+            result->has_ip_relative_opr = true;
             break;
 
         case RISCV_INS_C_J: // C.J (Compressed JAL)
@@ -195,6 +195,7 @@ void calculate_jump_offset_and_address(cs_insn *insn, struct intercept_disasm_re
             absolute_address = pc + offset;
             result->is_jump = true;
             result->is_rel_jump = true;
+            result->has_ip_relative_opr = true;
             break;
 
         case RISCV_INS_C_JAL: // C.JAL
@@ -202,6 +203,7 @@ void calculate_jump_offset_and_address(cs_insn *insn, struct intercept_disasm_re
             absolute_address = pc + offset;
             result->is_jump = true;
             result->is_rel_jump = true;
+            result->has_ip_relative_opr = true;
             break;
 
         case RISCV_INS_C_BEQZ: // C.BEQZ
@@ -210,6 +212,7 @@ void calculate_jump_offset_and_address(cs_insn *insn, struct intercept_disasm_re
             absolute_address = pc + offset;
             result->is_jump = true;
             result->is_rel_jump = true;
+            result->has_ip_relative_opr = true;
             break;
 
         default:
@@ -221,11 +224,10 @@ void calculate_jump_offset_and_address(cs_insn *insn, struct intercept_disasm_re
 
     result->rip_disp = offset;
     result->rip_ref_addr = (const unsigned char *)absolute_address;
-    result->has_ip_relative_opr = is_ip_relative(insn);
+    // result->has_ip_relative_opr = is_ip_relative(insn);
 }
 
 int64_t check_a7_reg(cs_insn *insn) {
-    cs_riscv *riscv = &(insn->detail->riscv);
     int64_t a7 = -1;
 
     if (insn->id == RISCV_INS_ADDI) {
@@ -248,13 +250,13 @@ int64_t check_a7_reg(cs_insn *insn) {
  */
 struct intercept_disasm_result
 intercept_disasm_next_instruction(struct intercept_disasm_context *context,
-					const unsigned char *code, int* syscall_reg)
+					const unsigned char *code, int64_t* syscall_reg)
 {
 	struct intercept_disasm_result result = {0, };
 	const unsigned char *start = code;
 	size_t size = (size_t)(context->end - code + 1);
 	uint64_t address = (uint64_t)code;
-
+    result.address = (const unsigned char *)(uintptr_t)address;
 	if (!cs_disasm_iter(context->handle, &start, &size,
 	    &address, context->insn)) {
 		return result;
@@ -265,17 +267,24 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 	assert(result.length != 0);
 
 	result.is_syscall = (context->insn->id == RISCV_INS_ECALL);
-	// result.is_ret = (context->insn->id == X86_INS_RET);
+
 	result.is_rel_jump = false;
 	result.is_indirect_jump = false;
-	// result.is_nop = is_nop(context->insn);
+    result.is_nop = (context->insn->id == RISCV_INS_C_NOP);
+    result.is_unimp = (context->insn->id == RISCV_INS_UNIMP);
+
 #ifndef NDEBUG
-	result.mnemonic = context->insn->mnemonic;
+    result.mnemonic = strdup(context->insn->mnemonic);
+    if (result.mnemonic == NULL) {
+        // Handle memory allocation failure
+        fprintf(stderr, "Memory allocation for mnemonic failed\n");
+        exit(EXIT_FAILURE);
+    }
 #endif
 
     result.is_jump = false;
 
-	calculate_jump_offset_and_address(context->insn, &result);
+	calculate_jump_offset_and_address(context->insn, address, &result);
     // debug_dump("0x%" PRIx64 ":\t%s\t%s\n", context->insn->address, context->insn->mnemonic, context->insn->op_str);
     int64_t a7  = check_a7_reg(context->insn);
     if(a7 != -1){
